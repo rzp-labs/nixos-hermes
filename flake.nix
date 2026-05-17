@@ -164,6 +164,7 @@
               unit = hostConfig.systemd.services.agentmemory;
               env = unit.environment;
               service = unit.serviceConfig;
+              stateDirectories = pkgs.lib.toList service.StateDirectory;
             in
             pkgs.runCommand "agentmemory-service-config" { } ''
               set -eu
@@ -181,11 +182,12 @@
               test '${env.AGENTMEMORY_TOOLS}' = 'core'
               test '${env.III_REST_PORT}' = '3111'
               test '${env.III_STREAMS_PORT}' = '3112'
+              test '${env.III_STREAM_PORT}' = '3112'
               test '${env.III_VIEWER_PORT}' = '3113'
               test '${env.III_ENGINE_URL}' = 'ws://127.0.0.1:49134'
               test '${service.User}' = 'agentmemory'
               test '${service.Group}' = 'agentmemory'
-              test '${service.StateDirectory}' = 'agentmemory'
+              test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
               test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
               test '${service.ProtectSystem}' = 'strict'
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
@@ -193,6 +195,9 @@
               ${service.ExecStart}
               EOF
               grep -q -- '${pkgs.bash}/bin' <<'EOF'
+              ${env.PATH}
+              EOF
+              grep -q -- '${hostConfig.services.agentmemory.package.passthru.iii-engine}/bin' <<'EOF'
               ${env.PATH}
               EOF
               grep -q -- 'agentmemory-iii-config.yaml' <<'EOF'

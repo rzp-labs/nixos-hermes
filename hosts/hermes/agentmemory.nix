@@ -152,21 +152,24 @@ in
         };
 
         # iii-exec launches configured commands via `sh -c`; keep the
-        # service PATH minimal, but include a shell so the Agent Memory
-        # worker process actually starts under systemd.
+        # service PATH minimal, but include the shell and engine runtime used
+        # by Agent Memory's worker process.
         path = [
           pkgs.bash
           pkgs.coreutils
+          cfg.package.passthru.iii-engine
         ];
 
         serviceConfig = {
           Type = "simple";
           User = "agentmemory";
           Group = "agentmemory";
-          StateDirectory = "agentmemory";
+          StateDirectory = [
+            "agentmemory"
+            "agentmemory/data"
+          ];
           StateDirectoryMode = "0700";
           WorkingDirectory = stateDir;
-          ExecStartPre = "${pkgs.coreutils}/bin/install -d -o agentmemory -g agentmemory -m 0700 ${dataDir}";
           ExecStart = "${lib.getExe cfg.package.passthru.iii-engine} --config ${iiiConfig}";
           Restart = "on-failure";
           RestartSec = "5s";
