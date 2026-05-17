@@ -201,6 +201,8 @@
               grep -qx 'HINDSIGHT_API_RERANKER_PROVIDER=rrf' ${envFile}
               grep -qx 'HINDSIGHT_API_DATABASE_URL=postgresql:///hermes?host=/run/postgresql' ${envFile}
               test '${toString (builtins.elem "hindsight-client" hermesExtraPythonPackageNames)}' = '1'
+              test '${toString (builtins.elem "aiohttp-retry" hermesExtraPythonPackageNames)}' = '1'
+              test '${toString hostConfig.systemd.services.hermes-agent.serviceConfig.TimeoutStopSec}' = '240'
               test -f ${hermesPythonPath}/sitecustomize.py
               grep -q 'find_library(name' ${hermesPythonPath}/sitecustomize.py
               grep -q 'libopus.so.0' ${hermesPythonPath}/sitecustomize.py

@@ -160,7 +160,12 @@
   # MESSAGING_CWD is deprecated in 0.10.0 in favour of terminal.cwd in config.yaml.
   # The upstream nixosModules.nix still sets it unconditionally; UnsetEnvironment
   # removes it from the service environment so hermes sees only the config.yaml value.
-  systemd.services.hermes-agent.serviceConfig.UnsetEnvironment = [ "MESSAGING_CWD" ];
+  systemd.services.hermes-agent.serviceConfig = {
+    UnsetEnvironment = [ "MESSAGING_CWD" ];
+    # Hermes gateway drain timeout is 180s; keep systemd's stop budget longer so
+    # rebuild/test restarts do not SIGKILL the gateway mid-drain.
+    TimeoutStopSec = 240;
+  };
 
   # opusCtypesShim patches ctypes.util.find_library("opus") at interpreter startup.
   # sitecustomize.py is imported by site.py before any user code; PYTHONPATH prepends
