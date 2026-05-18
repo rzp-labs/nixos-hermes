@@ -30,7 +30,10 @@ let
   aiohttpRetryForHermes = pythonPackages.aiohttp-retry.overridePythonAttrs (_old: {
     # Hermes' sealed runtime already supplies aiohttp. Propagating it from this
     # extra package collides with the sealed environment; only add the missing
-    # aiohttp_retry distribution to the Hermes wrapper.
+    # aiohttp_retry distribution to the Hermes wrapper. Newer nixpkgs Python
+    # builders use `dependencies`; clear both fields so the generated wrapper
+    # closure cannot reintroduce aiohttp through either spelling.
+    dependencies = [ ];
     propagatedBuildInputs = [ ];
     doCheck = false;
     pythonImportsCheck = [ ];
