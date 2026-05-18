@@ -155,7 +155,7 @@ in
 
             outputHashAlgo = "sha256";
             outputHashMode = "recursive";
-            outputHash = "sha256-R8lm2FIS8Dl81Ca6SB6gXYzmgBB1uj/4rz53B+clv8g=";
+            outputHash = "sha256-dp6Mdug/p3nhTLw56cjmgWKinFl+Dfg9Cbgu79Mielw=";
           };
         in
         prev.stdenvNoCC.mkDerivation {
@@ -193,7 +193,7 @@ in
         };
 
       # llama-cpp b6981 (pinned nixpkgs) predates Gemma 4 arch support (requires >= b8637).
-      # Override with b8770 from nixpkgs-llama until FlakeHub NixOS/nixpkgs/0 catches up.
+      # Override with b8770 from nixpkgs-llama until FlakeHub's NixOS/nixpkgs/0 catches up.
       llama-cpp = (nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system}).llama-cpp;
 
       llm-agents = prev.llm-agents // {
