@@ -76,8 +76,8 @@ Promotion is gated by evidence, not by the service merely staying up:
 
 | Gate | Criteria | Flags that may change after pass |
 | --- | --- | --- |
-| M1: declarative observer | Build/dry-build pass, loopback-only listeners, no runtime package install, service health OK, marker save/search survives restart, Hindsight continuity smoke still passes. | None; keep observer-only mode. |
-| M2: automatic capture proof | A fixed session set produces Agent Memory records without manual API calls, captured content is redacted enough for this host, and capture does not alter Hermes prompts/tool routing. | Consider `AGENTMEMORY_ALLOW_AGENT_SDK=true` only if the SDK path is required for capture and remains non-influential. |
+| M1: declarative observer | Build/dry-build pass, unit invariants prove loopback-only/pinned foreground service shape, systemd reports the service active, journald has no startup error, Hermes MCP/plugin discovery works, and Hindsight remains the active provider. | None; keep observer-only mode. |
+| M2: automatic capture proof | A fixed session set produces Agent Memory records without manual API calls, captured content is redacted enough for this host by source/static inspection plus one representative observation if needed, and capture does not alter Hermes prompts/tool routing. | Consider `AGENTMEMORY_ALLOW_AGENT_SDK=true` only if the SDK path is required for capture and remains non-influential. |
 | M3: quality/noise bake-off | The comparison query set shows useful recall with acceptable false positives/duplicates versus Hindsight, including explicit misses and bad recalls. | Consider `GRAPH_EXTRACTION_ENABLED=true` or `CONSOLIDATION_ENABLED=true` one at a time for a measured retest. |
 | M4: controlled influence trial | Human-approved narrow profile/session, fixed rollback point, prompt diff captured, no private/irrelevant memory injection, and Hindsight remains available as fallback. | Only then consider `AGENTMEMORY_INJECT_CONTEXT=true` for that controlled scope. |
 
@@ -101,15 +101,20 @@ For changes that affect activation/deployment mechanics, use the heavier VM swit
 
 ## Runtime smoke
 
-After an authorized host switch/restart, prove runtime separately from build proof:
+After an authorized host switch/restart, prove runtime separately from build proof with native system interfaces rather than a checked-in wrapper:
 
 ```bash
-systemctl is-active agentmemory.service
-ss -ltnp | grep -E ':(3111|3112|3113|49134)\b'
-curl -fsS http://127.0.0.1:3111/agentmemory/health
+systemctl status agentmemory.service --no-pager -l
+journalctl -u agentmemory.service -n 80 --no-pager
+curl -fsS http://127.0.0.1:3111/agentmemory/livez
+hermes mcp test agentmemory
+hermes plugins list | grep -E 'agentmemory[[:space:]].*enabled'
+hermes memory status | grep -E '^[[:space:]]*Provider:[[:space:]]+hindsight\b'
 ```
 
-Then save/search a marker and restart the service to prove persistence. Keep the exact API payloads/output in the Linear evidence comment for ONE-61. Do not call service health alone sufficient; ONE-61 requires health, listener binding, marker save/search, restart persistence, and Hindsight non-regression evidence.
+Those commands prove the M1 runtime boundary: the supervised service is up, failures are visible in journald, the REST listener answers locally, Hermes can discover Agent Memory tools, the plugin is enabled, and Agent Memory has not replaced Hindsight as the active memory provider.
+
+Do not turn this into a bespoke safety CLI. Redaction belongs in M2 automatic-capture evaluation: verify the upstream/source redaction path and use one representative observation only if the source inspection leaves an actual question. Manual REST remember/search probes are not evidence of automatic capture and should not be used to promote beyond M1.
 
 ## Ripcords
 
@@ -117,6 +122,6 @@ Disable Agent Memory and stop promotion if any of these occur:
 
 - any listener binds publicly;
 - the service uses runtime package installation;
-- unredacted secrets/private infrastructure are captured;
+- unredacted real secrets/private infrastructure are captured during automatic-capture evaluation;
 - Agent Memory blocks Hermes startup, gateway startup, or MCP discovery;
 - rollback cannot be represented as declarative configuration.
