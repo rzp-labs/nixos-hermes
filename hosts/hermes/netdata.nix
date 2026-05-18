@@ -149,6 +149,20 @@ let
     '';
   };
 
+  netdataGoPluginConfig = pkgs.writeText "netdata-go.d.conf" ''
+    enabled: yes
+    default_run: yes
+
+    modules:
+      # This host runs PostgreSQL for local services, but Netdata autodiscovery
+      # cannot authenticate to it by default and spams the journal with failed
+      # probe attempts. Keep process/systemd-level PostgreSQL visibility from
+      # apps/systemd collectors, but disable the DB-specific go.d collector until
+      # explicit DB credentials/role are intentionally provisioned.
+      postgres: no
+      pgbouncer: no
+  '';
+
   netdataObserve = pkgs.writeShellApplication {
     name = "netdata-observe";
     runtimeInputs = [
@@ -260,11 +274,28 @@ in
     enableAnalyticsReporting = false;
 
     config = {
+      plugins = {
+        # This host has no IPMI/BMC hardware; out-of-band management is AMT/vPro.
+        # Disable the enterprise-server hardware collector instead of letting it
+        # emit recurring FreeIPMI internal errors.
+        freeipmi = "no";
+      };
+
       web = {
         # No local dashboard exposure: Netdata Cloud is the operator UI. Keep
         # the host API loopback-only for diagnostics and netdata-observe.
         "bind to" = "127.0.0.1";
       };
+    };
+
+    configDir = {
+      # Netdata's scripts.d plugin watches this directory even when no jobs are
+      # configured. The NixOS module renders /etc/netdata/conf.d from only
+      # configDir entries, so expose the packaged empty/example directory to
+      # avoid one journal error per minute about a missing path.
+      "scripts.d" = "${netdataPackage}/share/netdata/conf.d/scripts.d";
+
+      "go.d.conf" = netdataGoPluginConfig;
     };
   };
 
@@ -289,8 +320,11 @@ in
     ];
   };
 
-  systemd.services.hermes-agent = {
-    wants = [ "netdata.service" ];
-    after = [ "netdata.service" ];
-  };
+  systemd.services.hermes-agent.serviceConfig.SupplementaryGroups = [
+    # Tool calls run under hermes-agent.service. Grant the service read-only
+    # journal access for netdata-observe logs without making Netdata a startup
+    # dependency of Hermes or making journal access a general property of every
+    # hermes login/session.
+    "systemd-journal"
+  ];
 }

@@ -233,8 +233,7 @@
               hostConfig = self.nixosConfigurations.nixos-hermes.config;
               netdataCfg = hostConfig.services.netdata;
               netdataUnit = hostConfig.systemd.services.netdata;
-              hermesAfter = hostConfig.systemd.services.hermes-agent.after;
-              hermesWants = hostConfig.systemd.services.hermes-agent.wants;
+              hermesSupplementaryGroups = pkgs.lib.toList hostConfig.systemd.services.hermes-agent.serviceConfig.SupplementaryGroups;
               systemPackages = builtins.map (pkg: pkgs.lib.getName pkg) hostConfig.environment.systemPackages;
               netdataLoadCredentials = pkgs.lib.toList netdataUnit.serviceConfig.LoadCredential;
               netdataExecStartPost = pkgs.lib.toList netdataUnit.serviceConfig.ExecStartPost;
@@ -245,6 +244,7 @@
               test '${netdataCfg.package.version}' = '2.10.2'
               test '${if netdataCfg.enableAnalyticsReporting then "true" else "false"}' = 'false'
               test '${netdataCfg.config.web."bind to"}' = '127.0.0.1'
+              test '${netdataCfg.config.plugins.freeipmi}' = 'no'
               test '${hostConfig.sops.secrets.netdata-claim-conf.sopsFile}' = '${./hosts/hermes/secrets/netdata-claim.conf}'
               test '${toString (builtins.elem "netdata_claim_conf:${hostConfig.sops.secrets.netdata-claim-conf.path}" netdataLoadCredentials)}' = '1'
               grep -q -- 'netdata-install-cloud-claim-conf' <<'EOF'
@@ -254,8 +254,11 @@
               ${builtins.toString netdataExecStartPost}
               EOF
               test '${toString (builtins.elem "netdata-observe" systemPackages)}' = '1'
-              test '${toString (builtins.elem "netdata.service" hermesAfter)}' = '1'
-              test '${toString (builtins.elem "netdata.service" hermesWants)}' = '1'
+              test '${toString (builtins.elem "systemd-journal" hermesSupplementaryGroups)}' = '1'
+              test -d '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d'
+              test -f '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d/nagios.conf'
+              grep -q -- 'postgres: no' '${hostConfig.environment.etc."netdata/conf.d".source}/go.d.conf'
+              grep -q -- 'pgbouncer: no' '${hostConfig.environment.etc."netdata/conf.d".source}/go.d.conf'
               grep -q -- '127.0.0.1' '${hostConfig.environment.etc."netdata/netdata.conf".source}'
               grep -q -- '-D -c /etc/netdata/netdata.conf' <<'EOF'
               ${netdataUnit.serviceConfig.ExecStart}
