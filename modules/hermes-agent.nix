@@ -141,7 +141,7 @@
       };
 
       agent = {
-        max_turns = 60; # Hard ceiling on turns per conversation
+        max_turns = 100; # Hard ceiling on turns per conversation
       };
 
       checkpoints = {
