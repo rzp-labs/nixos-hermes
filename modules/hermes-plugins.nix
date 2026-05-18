@@ -27,6 +27,16 @@ let
     pythonImportsCheck = [ "rtk_hermes" ];
   };
 
+  aiohttpRetryForHermes = pythonPackages.aiohttp-retry.overridePythonAttrs (_old: {
+    # Hermes' sealed runtime already supplies aiohttp. Propagating it from this
+    # extra package collides with the sealed environment; only add the missing
+    # aiohttp_retry distribution to the Hermes wrapper.
+    propagatedBuildInputs = [ ];
+    doCheck = false;
+    pythonImportsCheck = [ ];
+    dontCheckRuntimeDeps = true;
+  });
+
   hindsightClient = pythonPackages.buildPythonPackage rec {
     pname = "hindsight-client";
     version = "0.5.4";
@@ -65,6 +75,7 @@ in
     # see docs/guides/HERMES_PLUGINS_NIX.md for the repeatable workflow.
     extraPythonPackages = [
       rtkHermes
+      aiohttpRetryForHermes
       hindsightClient
     ];
 

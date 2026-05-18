@@ -158,6 +158,60 @@
             vm-switch-smoke
             ;
 
+          agentmemory-service-config =
+            let
+              hostConfig = self.nixosConfigurations.nixos-hermes.config;
+              unit = hostConfig.systemd.services.agentmemory;
+              env = unit.environment;
+              service = unit.serviceConfig;
+              stateDirectories = pkgs.lib.toList service.StateDirectory;
+            in
+            pkgs.runCommand "agentmemory-service-config" { } ''
+              set -eu
+              test '${if hostConfig.services.agentmemory.enable then "true" else "false"}' = 'true'
+              test '${hostConfig.services.agentmemory.package.version}' = '0.9.18'
+              test '${hostConfig.services.agentmemory.package.passthru.iii-engine.version}' = '0.11.2'
+              test '${env.HOME}' = '/var/lib/agentmemory'
+              test '${env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
+              test '${env.AGENTMEMORY_VIEWER_URL}' = 'http://127.0.0.1:3113'
+              test '${env.AGENTMEMORY_ALLOW_AGENT_SDK}' = 'false'
+              test '${env.AGENTMEMORY_AUTO_COMPRESS}' = 'false'
+              test '${env.GRAPH_EXTRACTION_ENABLED}' = 'false'
+              test '${env.CONSOLIDATION_ENABLED}' = 'false'
+              test '${env.AGENTMEMORY_INJECT_CONTEXT}' = 'false'
+              test '${env.AGENTMEMORY_TOOLS}' = 'core'
+              test '${env.III_REST_PORT}' = '3111'
+              test '${env.III_STREAMS_PORT}' = '3112'
+              test '${env.III_STREAM_PORT}' = '3112'
+              test '${env.III_VIEWER_PORT}' = '3113'
+              test '${env.III_ENGINE_URL}' = 'ws://127.0.0.1:49134'
+              test '${service.User}' = 'agentmemory'
+              test '${service.Group}' = 'agentmemory'
+              test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
+              test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
+              test '${service.ProtectSystem}' = 'strict'
+              test '${if service.ProtectHome then "true" else "false"}' = 'true'
+              grep -q -- '/bin/iii --config ' <<'EOF'
+              ${service.ExecStart}
+              EOF
+              grep -q -- '${pkgs.bash}/bin' <<'EOF'
+              ${env.PATH}
+              EOF
+              grep -q -- '${hostConfig.services.agentmemory.package.passthru.iii-engine}/bin' <<'EOF'
+              ${env.PATH}
+              EOF
+              grep -q -- 'agentmemory-iii-config.yaml' <<'EOF'
+              ${service.ExecStart}
+              EOF
+              case '${service.ExecStart}' in
+                *'/bin/agentmemory --tools core'*)
+                  echo 'agentmemory.service must supervise iii-engine directly, not the daemonizing CLI wrapper' >&2
+                  exit 1
+                  ;;
+              esac
+              touch $out
+            '';
+
           hindsight-service-config =
             let
               hostConfig = self.nixosConfigurations.nixos-hermes.config;
@@ -201,6 +255,8 @@
               grep -qx 'HINDSIGHT_API_RERANKER_PROVIDER=rrf' ${envFile}
               grep -qx 'HINDSIGHT_API_DATABASE_URL=postgresql:///hermes?host=/run/postgresql' ${envFile}
               test '${toString (builtins.elem "hindsight-client" hermesExtraPythonPackageNames)}' = '1'
+              test '${toString (builtins.elem "aiohttp-retry" hermesExtraPythonPackageNames)}' = '1'
+              test '${toString hostConfig.systemd.services.hermes-agent.serviceConfig.TimeoutStopSec}' = '240'
               test -f ${hermesPythonPath}/sitecustomize.py
               grep -q 'find_library(name' ${hermesPythonPath}/sitecustomize.py
               grep -q 'libopus.so.0' ${hermesPythonPath}/sitecustomize.py
