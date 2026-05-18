@@ -40,6 +40,18 @@ let
     dontCheckRuntimeDeps = true;
   });
 
+  agentmemorySource = pkgs.fetchFromGitHub {
+    owner = "rohitg00";
+    repo = "agentmemory";
+    rev = "9061da56d5caf9499f0bfb66f5cc35e648c1fb25";
+    hash = "sha256-5YjuZI/C8SfZCRhbpUZDLg+ZpBq+arlPFSPdk6X1pV8=";
+  };
+
+  agentmemoryHermesPlugin = pkgs.runCommand "agentmemory-hermes-plugin-0.9.18" { } ''
+    mkdir -p $out
+    cp -R ${agentmemorySource}/integrations/hermes/. $out/
+  '';
+
   hindsightClient = pythonPackages.buildPythonPackage rec {
     pname = "hindsight-client";
     version = "0.5.4";
@@ -87,8 +99,11 @@ in
     # mutable state in the service home.
     extraPackages = [ pkgs.llm-agents.rtk ];
 
+    extraPlugins = [ agentmemoryHermesPlugin ];
+
     settings.plugins.enabled = [
       "rtk-rewrite"
+      "agentmemory"
     ];
   };
 }

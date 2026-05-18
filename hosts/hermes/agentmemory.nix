@@ -127,6 +127,29 @@ in
 
       users.groups.agentmemory = { };
 
+      services.hermes-agent = {
+        environment = {
+          AGENTMEMORY_URL = "http://127.0.0.1:${toString restPort}";
+          # Keep the upstream plaintext-bearer guard enabled. The plugin allows
+          # loopback HTTP, but will fail closed if a future secret-bearing config
+          # drifts to plaintext HTTP on a non-loopback host.
+          AGENTMEMORY_REQUIRE_HTTPS = "1";
+        };
+
+        # Keep Hindsight as the active memory provider for the parallel
+        # evaluation; Agent Memory is installed as a discoverable provider and
+        # MCP server, but it must not influence live memory until later gates.
+        settings.memory.provider = lib.mkDefault "hindsight";
+
+        mcpServers.agentmemory = {
+          command = lib.getExe cfg.package;
+          args = [ "mcp" ];
+          env.AGENTMEMORY_URL = "http://127.0.0.1:${toString restPort}";
+          connect_timeout = 30;
+          timeout = 120;
+        };
+      };
+
       systemd.services.agentmemory = {
         description = "Agent Memory parallel observer";
         after = [ "network.target" ];
