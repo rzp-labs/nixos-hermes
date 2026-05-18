@@ -165,6 +165,11 @@
               env = unit.environment;
               service = unit.serviceConfig;
               stateDirectories = pkgs.lib.toList service.StateDirectory;
+              hermesMcp = hostConfig.services.hermes-agent.mcpServers.agentmemory;
+              hermesPluginNames = builtins.concatStringsSep "\n" (
+                map toString hostConfig.services.hermes-agent.extraPlugins
+              );
+              hermesEnabledPlugins = builtins.concatStringsSep " " hostConfig.services.hermes-agent.settings.plugins.enabled;
             in
             pkgs.runCommand "agentmemory-service-config" { } ''
               set -eu
@@ -189,6 +194,16 @@
               test '${service.Group}' = 'agentmemory'
               test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
               test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
+              test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
+              test '${builtins.concatStringsSep " " hermesMcp.args}' = 'mcp'
+              test '${hermesMcp.env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
+              grep -q -- 'agentmemory-hermes-plugin' <<'EOF'
+              ${hermesPluginNames}
+              EOF
+              grep -qw -- 'agentmemory' <<'EOF'
+              ${hermesEnabledPlugins}
+              EOF
+              test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'hindsight'
               test '${service.ProtectSystem}' = 'strict'
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
               grep -q -- '/bin/iii --config ' <<'EOF'

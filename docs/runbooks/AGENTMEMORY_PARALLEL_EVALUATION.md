@@ -53,6 +53,23 @@ AGENTMEMORY_TOOLS=core
 
 Hindsight remains the Hermes memory provider during this milestone.
 
+## Hermes integration
+
+Hermes integration is declarative and split into two non-mutating paths:
+
+- `modules/hermes-plugins.nix` pins the Agent Memory source commit matching npm `0.9.18` (`9061da56d5caf9499f0bfb66f5cc35e648c1fb25`) and installs `integrations/hermes` through `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
+- `hosts/hermes/agentmemory.nix` configures `services.hermes-agent.mcpServers.agentmemory` to run the pinned local package directly:
+
+  ```nix
+  command = "${pkgs.agentmemory}/bin/agentmemory";
+  args = [ "mcp" ];
+  env.AGENTMEMORY_URL = "http://127.0.0.1:3111";
+  ```
+
+Do not replace this with upstream's `npx -y @agentmemory/mcp` examples. The Nix package already contains the canonical `agentmemory mcp` shim and keeps MCP package resolution pinned to the host closure.
+
+`memory.provider` remains `hindsight` during the shadow evaluation. The Agent Memory provider plugin is installed and discoverable, but switching the active Hermes provider to `agentmemory` is an influence change and belongs behind the later evaluation gates.
+
 ## Evaluation gates
 
 Promotion is gated by evidence, not by the service merely staying up:
