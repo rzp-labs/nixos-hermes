@@ -40,12 +40,12 @@ in
     };
   };
 
-  # Hermes can start before Hindsight and reconnect on the next agent
-  # construction. Keep startup resilient by requesting Hindsight without making
-  # every transient Hindsight failure fatal to the assistant itself.
+  # Hindsight is a local memory provider, not a Hermes lifecycle dependency.
+  # Keep startup ordering when both units are queued, but do not have Hermes pull
+  # Hindsight into the transaction; provider failures should degrade memory, not
+  # assistant/gateway availability.
   systemd.services.hermes-agent = lib.mkIf cfg.enable {
     after = [ "hindsight-embed.service" ];
-    wants = [ "hindsight-embed.service" ];
   };
 
   # Recurring refresh, not one-shot: Hindsight's provider config file takes

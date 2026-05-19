@@ -289,7 +289,7 @@
               test '${hermesEnv.HINDSIGHT_BANK_ID}' = 'hermes'
               test '${hermesEnv.HINDSIGHT_BUDGET}' = 'mid'
               test '${toString (builtins.elem "hindsight-embed.service" hermesAfter)}' = '1'
-              test '${toString (builtins.elem "hindsight-embed.service" hermesWants)}' = '1'
+              test '${toString (builtins.elem "hindsight-embed.service" hermesWants)}' != '1'
               grep -q -- 'hermes-hindsight-config.json' <<'EOF'
               ${hindsightActivation}
               EOF
