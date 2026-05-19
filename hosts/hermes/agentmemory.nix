@@ -136,10 +136,10 @@ in
           AGENTMEMORY_REQUIRE_HTTPS = "1";
         };
 
-        # Keep Hindsight as the active memory provider for the parallel
-        # evaluation; Agent Memory is installed as a discoverable provider and
-        # MCP server, but it must not influence live memory until later gates.
-        settings.memory.provider = lib.mkDefault "hindsight";
+        # Agent Memory is now the active Hermes memory provider. Hindsight was
+        # useful as a spike, but its retain/consolidation path proved too costly
+        # and fragile to keep in the live assistant loop.
+        settings.memory.provider = "agentmemory";
 
         mcpServers.agentmemory = {
           command = lib.getExe cfg.package;

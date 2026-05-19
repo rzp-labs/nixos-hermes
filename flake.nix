@@ -204,7 +204,7 @@
               grep -qw -- 'agentmemory' <<'EOF'
               ${hermesEnabledPlugins}
               EOF
-              test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'hindsight'
+              test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'agentmemory'
               test '${service.ProtectSystem}' = 'strict'
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
               grep -q -- '/bin/iii --config ' <<'EOF'
@@ -239,6 +239,8 @@
               netdataExecStartPost = pkgs.lib.toList netdataUnit.serviceConfig.ExecStartPost;
               netdataSupplementaryGroups = pkgs.lib.toList netdataUnit.serviceConfig.SupplementaryGroups;
               hermesNetdataMcp = hostConfig.services.hermes-agent.mcpServers.netdata;
+              serviceNames = builtins.attrNames hostConfig.systemd.services;
+              netdataConfigDirNames = builtins.attrNames netdataCfg.configDir;
             in
             pkgs.runCommand "netdata-service-config" { } ''
               set -eu
@@ -265,22 +267,13 @@
               test '${toString (builtins.elem "systemd-journal" hermesSupplementaryGroups)}' = '1'
               test -d '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d'
               test -f '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d/nagios.conf'
-              grep -q -- "dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'" '${
-                hostConfig.environment.etc."netdata/conf.d".source
-              }/go.d/postgres.conf'
-              grep -q -- "collect_databases_matching: '*'" '${
-                hostConfig.environment.etc."netdata/conf.d".source
-              }/go.d/postgres.conf'
-              grep -q -- "autodetection_retry: 60" '${
-                hostConfig.environment.etc."netdata/conf.d".source
-              }/go.d/postgres.conf'
+              test '${if hostConfig.services.postgresql.enable then "true" else "false"}' = 'false'
               test '${
-                toString (builtins.any (user: user.name == "netdata") hostConfig.services.postgresql.ensureUsers)
-              }' = '1'
-              grep -q -- 'GRANT pg_monitor TO netdata' <<'EOF'
-              ${hostConfig.systemd.services.netdata-postgres-monitoring-setup.serviceConfig.ExecStart}
-              EOF
-              test '${hostConfig.systemd.services.netdata-postgres-monitoring-setup.serviceConfig.User}' = 'postgres'
+                if builtins.elem "go.d/postgres.conf" netdataConfigDirNames then "true" else "false"
+              }' = 'false'
+              test '${
+                if builtins.elem "netdata-postgres-monitoring-setup" serviceNames then "true" else "false"
+              }' = 'false'
               grep -q -- '127.0.0.1' '${hostConfig.environment.etc."netdata/netdata.conf".source}'
               grep -q -- '-D -c /etc/netdata/netdata.conf' <<'EOF'
               ${netdataUnit.serviceConfig.ExecStart}
@@ -291,107 +284,24 @@
           hindsight-service-config =
             let
               hostConfig = self.nixosConfigurations.nixos-hermes.config;
-              hindsightUnit = hostConfig.systemd.services.hindsight-embed;
-              hindsightInitUnit = hostConfig.systemd.services.hindsight-postgres-init;
-              llamaUnit = hostConfig.systemd.services.llama-server;
-              envFile = builtins.head (pkgs.lib.toList hindsightUnit.serviceConfig.EnvironmentFile);
-              llamaExec = llamaUnit.serviceConfig.ExecStart;
-              hindsightExec = hindsightUnit.serviceConfig.ExecStart;
-              hindsightExecStartPre = pkgs.lib.toList hindsightUnit.serviceConfig.ExecStartPre;
-              hindsightSetupExec = builtins.elemAt hindsightExecStartPre 0;
-              hindsightRecoveryExec = builtins.elemAt hindsightExecStartPre 1;
-              hindsightRestartTriggers = pkgs.lib.toList hindsightUnit.restartTriggers;
-              pgInitExec = hindsightInitUnit.serviceConfig.ExecStart;
+              serviceNames = builtins.attrNames hostConfig.systemd.services;
               hermesMemory = hostConfig.services.hermes-agent.settings.memory;
-              hermesEnv = hostConfig.services.hermes-agent.environment;
-              hermesExtraPythonPackageNames = map (
-                pkg: pkg.pname or ""
-              ) hostConfig.services.hermes-agent.extraPythonPackages;
+              hermesEnvNames = builtins.attrNames hostConfig.services.hermes-agent.environment;
               hermesAfter = hostConfig.systemd.services.hermes-agent.after;
               hermesWants = hostConfig.systemd.services.hermes-agent.wants;
-              hermesPythonPath = hostConfig.systemd.services.hermes-agent.environment.PYTHONPATH;
-              hindsightActivation = hostConfig.system.activationScripts.hermes-hindsight-config.text;
             in
             pkgs.runCommand "hindsight-service-config" { } ''
               set -eu
-
-              grep -qx 'LD_LIBRARY_PATH=.*gcc.*-lib/lib' ${envFile}
-              grep -qx 'HINDSIGHT_API_LLM_PROVIDER=openai' ${envFile}
-              grep -qx 'HINDSIGHT_API_LLM_BASE_URL=http://10.0.0.102:8317/v1' ${envFile}
-              grep -qx 'HINDSIGHT_API_LLM_MODEL=gpt-5.4-mini' ${envFile}
-              grep -qx 'HINDSIGHT_API_LLM_TIMEOUT=120' ${envFile}
-              ! grep -q '^HINDSIGHT_API_LLM_API_KEY=' ${envFile}
-              test '${toString (builtins.elem "cliproxyapi-key:${hostConfig.sops.secrets."cliproxyapi-key".path}" hindsightUnit.serviceConfig.LoadCredential)}' = '1'
-              grep -qx 'HINDSIGHT_API_RETAIN_MAX_COMPLETION_TOKENS=4096' ${envFile}
-              grep -qx 'HINDSIGHT_API_RETAIN_EXTRACTION_MODE=custom' ${envFile}
-              grep -q 'top-level "facts" array' ${envFile}
-              grep -q 'extract only the durable lesson' ${envFile}
-              grep -qx 'HINDSIGHT_API_EMBEDDINGS_PROVIDER=openai' ${envFile}
-              grep -qx 'HINDSIGHT_API_EMBEDDINGS_OPENAI_MODEL=google_gemma-4-E2B-it-Q6_K_L.gguf' ${envFile}
-              grep -qx 'HINDSIGHT_API_RERANKER_PROVIDER=rrf' ${envFile}
-              grep -qx 'HINDSIGHT_API_DATABASE_URL=postgresql:///hermes?host=/run/postgresql' ${envFile}
-              test '${toString (builtins.elem "hindsight-client" hermesExtraPythonPackageNames)}' = '1'
-              test '${toString (builtins.elem "aiohttp-retry" hermesExtraPythonPackageNames)}' = '1'
-              test '${toString hostConfig.systemd.services.hermes-agent.serviceConfig.TimeoutStopSec}' = '240'
-              test -f ${hermesPythonPath}/sitecustomize.py
-              grep -q 'find_library(name' ${hermesPythonPath}/sitecustomize.py
-              grep -q 'libopus.so.0' ${hermesPythonPath}/sitecustomize.py
-              if grep -q 'hindsight_venv' ${hermesPythonPath}/sitecustomize.py; then
-                echo 'sitecustomize.py must not add the Hindsight writable venv to sys.path' >&2
-                exit 1
-              fi
-              if grep -q '/var/lib/hermes/.venv' ${hermesPythonPath}/sitecustomize.py; then
-                echo 'sitecustomize.py must not reference the Hindsight writable venv' >&2
-                exit 1
-              fi
-              test '${hermesMemory.provider}' = 'hindsight'
-              test '${hermesEnv.HINDSIGHT_MODE}' = 'local_external'
-              test '${hermesEnv.HINDSIGHT_API_URL}' = 'http://127.0.0.1:8888'
-              test '${hermesEnv.HINDSIGHT_BANK_ID}' = 'hermes'
-              test '${hermesEnv.HINDSIGHT_BUDGET}' = 'mid'
-              test '${toString (builtins.elem "hindsight-embed.service" hermesAfter)}' = '1'
-              test '${toString (builtins.elem "hindsight-embed.service" hermesWants)}' != '1'
-              grep -q -- 'hermes-hindsight-config.json' <<'EOF'
-              ${hindsightActivation}
-              EOF
-              grep -q -- 'hindsight/config.json' <<'EOF'
-              ${hindsightActivation}
-              EOF
-              grep -q -- 'CREATE EXTENSION IF NOT EXISTS vector' ${pgInitExec}
-              grep -q -- 'CREATE OR REPLACE FUNCTION public.schemas_with_pending_work' ${pgInitExec}
-              grep -q -- 'RETURN NEXT NULL::text' ${pgInitExec}
-              grep -q -- 'tenant_%' ${pgInitExec}
-              grep -q -- '--embeddings' <<'EOF'
-              ${llamaExec}
-              EOF
-              grep -q -- '--pooling' <<'EOF'
-              ${llamaExec}
-              EOF
-              grep -q -- 'mean' <<'EOF'
-              ${llamaExec}
-              EOF
-              ! grep -q -- '--chat-template' <<'EOF'
-              ${llamaExec}
-              EOF
-
-              grep -q -- 'hindsight-api --host 127.0.0.1 --port 8888' ${hindsightExec}
-              ! grep -q -- 'decommission-workers --yes' ${hindsightExec}
-              test '${toString (builtins.length hindsightExecStartPre)}' = '2'
-              grep -q -- 'hindsight_api.admin.cli' ${hindsightRecoveryExec}
-              grep -q -- 'decommission-workers --yes' ${hindsightRecoveryExec}
-              grep -q -- "to_regclass('public.async_operations')" ${hindsightRecoveryExec}
-              grep -q -- 'timeout 15s' ${hindsightRecoveryExec}
-              llm_preflight="$(sed -n 's#.* \(/nix/store/.*hindsight-llm-preflight.py\)$#\1#p' ${hindsightRecoveryExec})"
-              test -n "$llm_preflight"
-              grep -q -- '/models' "$llm_preflight"
-              grep -q -- 'Authorization' "$llm_preflight"
-              grep -q -- 'HINDSIGHT_API_LLM_MODEL' "$llm_preflight"
-              grep -q -- 'Missing configured Hindsight LLM model' "$llm_preflight"
-              test '${toString (builtins.elem envFile hindsightRestartTriggers)}' = '1'
-              test '${toString (builtins.elem hindsightSetupExec hindsightRestartTriggers)}' = '1'
-              test '${toString (builtins.elem hindsightRecoveryExec hindsightRestartTriggers)}' = '1'
-              test '${toString (builtins.elem hindsightExec hindsightRestartTriggers)}' = '1'
-
+              test '${if hostConfig.services.hindsightMemory.enable then "true" else "false"}' = 'false'
+              test '${hermesMemory.provider}' = 'agentmemory'
+              test '${if builtins.elem "hindsight-embed" serviceNames then "true" else "false"}' = 'false'
+              test '${if builtins.elem "hindsight-postgres-init" serviceNames then "true" else "false"}' = 'false'
+              test '${if builtins.elem "llama-server" serviceNames then "true" else "false"}' = 'false'
+              test '${if builtins.elem "hindsight-embed.service" hermesAfter then "true" else "false"}' = 'false'
+              test '${if builtins.elem "hindsight-embed.service" hermesWants then "true" else "false"}' = 'false'
+              test '${if builtins.elem "HINDSIGHT_MODE" hermesEnvNames then "true" else "false"}' = 'false'
+              test '${if builtins.elem "HINDSIGHT_API_URL" hermesEnvNames then "true" else "false"}' = 'false'
+              test '${if builtins.elem "HINDSIGHT_BANK_ID" hermesEnvNames then "true" else "false"}' = 'false'
               touch $out
             '';
         }
