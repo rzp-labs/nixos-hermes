@@ -237,6 +237,7 @@
               systemPackages = builtins.map (pkg: pkgs.lib.getName pkg) hostConfig.environment.systemPackages;
               netdataLoadCredentials = pkgs.lib.toList netdataUnit.serviceConfig.LoadCredential;
               netdataExecStartPost = pkgs.lib.toList netdataUnit.serviceConfig.ExecStartPost;
+              netdataSupplementaryGroups = pkgs.lib.toList netdataUnit.serviceConfig.SupplementaryGroups;
               hermesNetdataMcp = hostConfig.services.hermes-agent.mcpServers.netdata;
             in
             pkgs.runCommand "netdata-service-config" { } ''
@@ -246,6 +247,8 @@
               test '${if netdataCfg.enableAnalyticsReporting then "true" else "false"}' = 'false'
               test '${netdataCfg.config.web."bind to"}' = '127.0.0.1'
               test '${netdataCfg.config.plugins.freeipmi}' = 'no'
+              test '${netdataCfg.config.plugins."logs-management"}' = 'no'
+              test '${toString (builtins.elem "systemd-journal" netdataSupplementaryGroups)}' = '1'
               test '${hostConfig.sops.secrets.netdata-claim-conf.sopsFile}' = '${./hosts/hermes/secrets/netdata-claim.conf}'
               test '${toString (builtins.elem "netdata_claim_conf:${hostConfig.sops.secrets.netdata-claim-conf.path}" netdataLoadCredentials)}' = '1'
               grep -q -- 'netdata-install-cloud-claim-conf' <<'EOF'
@@ -354,9 +357,10 @@
               grep -q -- 'hindsight/config.json' <<'EOF'
               ${hindsightActivation}
               EOF
-              grep -q -- 'CREATE EXTENSION IF NOT EXISTS vector' <<'EOF'
-              ${pgInitExec}
-              EOF
+              grep -q -- 'CREATE EXTENSION IF NOT EXISTS vector' ${pgInitExec}
+              grep -q -- 'CREATE OR REPLACE FUNCTION public.schemas_with_pending_work' ${pgInitExec}
+              grep -q -- 'RETURN NEXT NULL::text' ${pgInitExec}
+              grep -q -- 'tenant_%' ${pgInitExec}
               grep -q -- '--embeddings' <<'EOF'
               ${llamaExec}
               EOF

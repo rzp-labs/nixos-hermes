@@ -244,7 +244,8 @@ let
             usage >&2
             exit 2
           fi
-          get "/api/v1/data?chart=$chart&after=-$seconds&format=json"
+          chart_encoded=$(jq -rn --arg v "$chart" '$v|@uri')
+          get "/api/v1/data?chart=$chart_encoded&after=-$seconds&format=json"
           ;;
         api)
           target="''${1:-}"
@@ -290,6 +291,12 @@ in
         # Disable the enterprise-server hardware collector instead of letting it
         # emit recurring FreeIPMI internal errors.
         freeipmi = "no";
+
+        # The Nix package exposes systemd-journal/OTel log functions, but does
+        # not ship logs-management.plugin. Without this explicit disable, the
+        # generated setuid wrapper directory advertises a missing plugin and
+        # Netdata logs an exit-127 collector failure on every restart.
+        "logs-management" = "no";
       };
 
       web = {
@@ -347,6 +354,12 @@ in
   ];
 
   systemd.services.netdata.serviceConfig = {
+    SupplementaryGroups = [
+      # Netdata Cloud's systemd-journal function is served by the Netdata agent,
+      # not by Hermes. Grant the agent read-only journal group access so log
+      # exploration works without exposing the local dashboard beyond loopback.
+      "systemd-journal"
+    ];
     LoadCredential = [
       "netdata_claim_conf:${config.sops.secrets.netdata-claim-conf.path}"
     ];
