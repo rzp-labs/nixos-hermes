@@ -237,6 +237,7 @@
               systemPackages = builtins.map (pkg: pkgs.lib.getName pkg) hostConfig.environment.systemPackages;
               netdataLoadCredentials = pkgs.lib.toList netdataUnit.serviceConfig.LoadCredential;
               netdataExecStartPost = pkgs.lib.toList netdataUnit.serviceConfig.ExecStartPost;
+              hermesNetdataMcp = hostConfig.services.hermes-agent.mcpServers.netdata;
             in
             pkgs.runCommand "netdata-service-config" { } ''
               set -eu
@@ -254,6 +255,10 @@
               ${builtins.toString netdataExecStartPost}
               EOF
               test '${toString (builtins.elem "netdata-observe" systemPackages)}' = '1'
+              grep -q -- '/bin/nd-mcp-bridge' <<'EOF'
+              ${hermesNetdataMcp.command}
+              EOF
+              test '${builtins.concatStringsSep " " hermesNetdataMcp.args}' = 'ws://127.0.0.1:19999/mcp'
               test '${toString (builtins.elem "systemd-journal" hermesSupplementaryGroups)}' = '1'
               test -d '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d'
               test -f '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d/nagios.conf'
