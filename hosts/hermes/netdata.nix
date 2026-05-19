@@ -25,46 +25,58 @@ let
         fetchSubmodules = true;
       };
 
-      passthru = previousAttrs.passthru // {
-        nd-mcp =
-          (pkgs.buildGoModule {
-            pname = "${finalAttrs.pname}-nd-mcp";
-            inherit (finalAttrs) version src;
-            sourceRoot = "${finalAttrs.src.name}/src/web/mcp/bridges/stdio-golang";
-            vendorHash = "sha256-jyCTp52Dc2IuRwzGT+sHFljO30oqAMfe3xVdEpV+R2c=";
-            proxyVendor = true;
-            doCheck = false;
-            subPackages = [ "." ];
-            ldflags = [
-              "-s"
-              "-w"
-            ];
-            meta = finalAttrs.meta // {
-              description = "Netdata Model Context Protocol (MCP) Integration";
-              license = lib.licenses.gpl3Only;
+      passthru =
+        previousAttrs.passthru
+        // (
+          let
+            ndMcpBridge = pkgs.buildGoModule {
+              pname = "${finalAttrs.pname}-nd-mcp";
+              inherit (finalAttrs) version src;
+              sourceRoot = "${finalAttrs.src.name}/src/web/mcp/bridges/stdio-golang";
+              vendorHash = "sha256-jyCTp52Dc2IuRwzGT+sHFljO30oqAMfe3xVdEpV+R2c=";
+              proxyVendor = true;
+              doCheck = false;
+              subPackages = [ "." ];
+              ldflags = [
+                "-s"
+                "-w"
+              ];
+              meta = finalAttrs.meta // {
+                description = "Netdata Model Context Protocol (MCP) stdio bridge";
+                mainProgram = "nd-mcp-bridge";
+                license = lib.licenses.gpl3Only;
+              };
             };
-          }).goModules;
+            goPlugin = pkgs.buildGoModule {
+              pname = "${finalAttrs.pname}-go-plugins";
+              inherit (finalAttrs) version src;
+              sourceRoot = "${finalAttrs.src.name}/src/go/plugin/go.d";
+              vendorHash = "sha256-HRe1bcVIQVzwPZnGlAK5A8AO1VTcjFajkPwBVdl4UIA=";
+              proxyVendor = true;
+              doCheck = false;
+              ldflags = [
+                "-s"
+                "-w"
+                "-X main.version=${finalAttrs.version}"
+              ];
+              meta = finalAttrs.meta // {
+                description = "Netdata orchestrator for data collection modules written in Go";
+                mainProgram = "godplugin";
+                license = lib.licenses.gpl3Only;
+              };
+            };
+          in
+          {
+            # These attr names are consumed by the upstream Netdata CMake build as
+            # file:// GOPROXY inputs, so they must stay as module proxy trees.
+            nd-mcp = ndMcpBridge.goModules;
+            netdata-go-modules = goPlugin.goModules;
 
-        netdata-go-modules =
-          (pkgs.buildGoModule {
-            pname = "${finalAttrs.pname}-go-plugins";
-            inherit (finalAttrs) version src;
-            sourceRoot = "${finalAttrs.src.name}/src/go/plugin/go.d";
-            vendorHash = "sha256-HRe1bcVIQVzwPZnGlAK5A8AO1VTcjFajkPwBVdl4UIA=";
-            proxyVendor = true;
-            doCheck = false;
-            ldflags = [
-              "-s"
-              "-w"
-              "-X main.version=${finalAttrs.version}"
-            ];
-            meta = finalAttrs.meta // {
-              description = "Netdata orchestrator for data collection modules written in Go";
-              mainProgram = "godplugin";
-              license = lib.licenses.gpl3Only;
-            };
-          }).goModules;
-      };
+            # Export the runnable packages separately for host/Hermes usage.
+            nd-mcp-bridge = ndMcpBridge;
+            netdata-go-plugin = goPlugin;
+          }
+        );
 
       cargoRoot = "src/crates";
       cargoDeps = pkgs.symlinkJoin {
@@ -125,9 +137,9 @@ let
       fi
 
       key="$(< "$session_key_file")"
-      token="$(awk -F= '/^[[:space:]]*token[[:space:]]*=/{ sub(/^[[:space:]]*/, "", $2); print $2 }' "$claim_conf")"
-      url="$(awk -F= '/^[[:space:]]*url[[:space:]]*=/{ sub(/^[[:space:]]*/, "", $2); print $2 }' "$claim_conf")"
-      rooms="$(awk -F= '/^[[:space:]]*rooms[[:space:]]*=/{ sub(/^[[:space:]]*/, "", $2); print $2 }' "$claim_conf")"
+      token="$(awk -F= '/^[[:space:]]*token[[:space:]]*=/{ sub(/^[[:space:]]*/, "", $2); print $2; exit }' "$claim_conf")"
+      url="$(awk -F= '/^[[:space:]]*url[[:space:]]*=/{ sub(/^[[:space:]]*/, "", $2); print $2; exit }' "$claim_conf")"
+      rooms="$(awk -F= '/^[[:space:]]*rooms[[:space:]]*=/{ sub(/^[[:space:]]*/, "", $2); print $2; exit }' "$claim_conf")"
 
       if [[ -z "$token" || -z "$url" ]]; then
         echo "Netdata claim configuration is missing token or url" >&2
@@ -298,6 +310,11 @@ in
     };
   };
 
+  services.hermes-agent.mcpServers.netdata = {
+    command = lib.getExe netdataPackage.passthru.nd-mcp-bridge;
+    args = [ "ws://127.0.0.1:19999/mcp" ];
+  };
+
   services.postgresql.ensureUsers = [
     {
       name = "netdata";
@@ -339,7 +356,7 @@ in
         "$CREDENTIALS_DIRECTORY/netdata_claim_conf" \
         /etc/netdata/claim.conf
     ''}";
-    ExecStartPost = lib.mkForce [
+    ExecStartPost = [
       "${netdataWaitForApi}"
       "+${lib.getExe netdataCloudClaim}"
     ];

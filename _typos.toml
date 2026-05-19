@@ -8,3 +8,8 @@ extend-exclude = [".gitignore", "hosts/hermes/secrets/", "tests/assets/", "asset
 [default.extend-identifiers]
 # Netdata's MCP bridge package path uses the upstream abbreviation "nd".
 nd = "nd"
+ndMcpBridge = "ndMcpBridge"
+
+[default.extend-words]
+# Netdata's MCP bridge package path uses the upstream abbreviation "nd".
+nd = "nd"
