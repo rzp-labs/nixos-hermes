@@ -155,7 +155,7 @@ let
     # Use peer auth over the local Unix socket; no SOPS password is needed for
     # this host-local collector.
     update_every: 1
-    autodetection_retry: 0
+    autodetection_retry: 60
     jobs:
       - name: local
         dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'
@@ -304,9 +304,25 @@ in
     }
   ];
 
-  systemd.services.postgresql.postStart = lib.mkAfter ''
-    ${config.services.postgresql.package}/bin/psql -d postgres -tAc 'GRANT pg_monitor TO netdata;'
-  '';
+  systemd.services.netdata-postgres-monitoring-setup = {
+    description = "Grant PostgreSQL monitoring privileges to Netdata";
+    wantedBy = [ "multi-user.target" ];
+    after = [
+      "postgresql.service"
+      "postgresql-setup.service"
+    ];
+    requires = [
+      "postgresql.service"
+      "postgresql-setup.service"
+    ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      User = "postgres";
+      Group = "postgres";
+      ExecStart = "${config.services.postgresql.package}/bin/psql -d postgres -tAc 'GRANT pg_monitor TO netdata;'";
+    };
+  };
 
   environment.systemPackages = [
     netdataPackage

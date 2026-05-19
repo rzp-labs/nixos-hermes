@@ -263,12 +263,16 @@
               grep -q -- "collect_databases_matching: '*'" '${
                 hostConfig.environment.etc."netdata/conf.d".source
               }/go.d/postgres.conf'
+              grep -q -- "autodetection_retry: 60" '${
+                hostConfig.environment.etc."netdata/conf.d".source
+              }/go.d/postgres.conf'
               test '${
                 toString (builtins.any (user: user.name == "netdata") hostConfig.services.postgresql.ensureUsers)
               }' = '1'
               grep -q -- 'GRANT pg_monitor TO netdata' <<'EOF'
-              ${hostConfig.systemd.services.postgresql.postStart}
+              ${hostConfig.systemd.services.netdata-postgres-monitoring-setup.serviceConfig.ExecStart}
               EOF
+              test '${hostConfig.systemd.services.netdata-postgres-monitoring-setup.serviceConfig.User}' = 'postgres'
               grep -q -- '127.0.0.1' '${hostConfig.environment.etc."netdata/netdata.conf".source}'
               grep -q -- '-D -c /etc/netdata/netdata.conf' <<'EOF'
               ${netdataUnit.serviceConfig.ExecStart}
