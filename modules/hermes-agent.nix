@@ -9,6 +9,11 @@
     enable = true;
     addToSystemPackages = true;
 
+    # Optional Hermes pyproject dependency groups included in the sealed Python
+    # environment. The Discord gateway adapter lives in the upstream
+    # "messaging" group; without it the service can run while Discord is absent.
+    extraDependencyGroups = [ "messaging" ];
+
     # Packages required by enabled toolsets.
     # playwright-driver.browsers: NixOS-wrapped browser binaries for the browser toolset.
     # ffmpeg: audio processing for ElevenLabs TTS voice bubble delivery.
@@ -117,6 +122,9 @@
         require_mention = true; # Respond only when @mentioned
         auto_thread = true; # Isolate each conversation in a thread
         reactions = true; # Emoji reactions for processing state
+        # Keep the upstream default explicit: if Discord presence expands beyond
+        # the restricted Hermes channels below, review this context-ingestion boundary.
+        history_backfill = true;
         allowed_channels = [
           # Restrict to specific channel IDs; empty = all
           "1493930581090762833" # hermes-yui (text)
