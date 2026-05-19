@@ -4,10 +4,10 @@
   inputs = {
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0";
-    # nixpkgs-llama tracks a nixpkgs commit that ships llama-cpp >= b8637, which is
-    # required for Gemma 4 (gemma4 arch) support.  Used only for the llama-cpp overlay
-    # in modules/packages.nix.  Remove once FlakeHub's NixOS/nixpkgs/0 advances past
-    # nixpkgs commit a4bf06618f0b5ee50f14ed8f0da77d34ecc19160 (currently at b6981).
+
+    # Raw GitHub exception documented in AGENTS.md: this temporary package-set
+    # pin supplies llama-cpp with Gemma 4 support while the primary FlakeHub
+    # NixOS/nixpkgs/0 input lags host-required versions.
     nixpkgs-llama.url = "github:NixOS/nixpkgs/0726a0ecb6d4e08f6adced58726b95db924cef57";
     sops-nix.url = "https://flakehub.com/f/Mic92/sops-nix/0.1.1200";
     disko.url = "https://flakehub.com/f/nix-community/disko/*";
@@ -27,6 +27,7 @@
     {
       self,
       nixpkgs,
+
       nixpkgs-llama,
       determinate,
       sops-nix,
@@ -227,6 +228,66 @@
               touch $out
             '';
 
+          netdata-service-config =
+            let
+              hostConfig = self.nixosConfigurations.nixos-hermes.config;
+              netdataCfg = hostConfig.services.netdata;
+              netdataUnit = hostConfig.systemd.services.netdata;
+              hermesSupplementaryGroups = pkgs.lib.toList hostConfig.systemd.services.hermes-agent.serviceConfig.SupplementaryGroups;
+              systemPackages = builtins.map (pkg: pkgs.lib.getName pkg) hostConfig.environment.systemPackages;
+              netdataLoadCredentials = pkgs.lib.toList netdataUnit.serviceConfig.LoadCredential;
+              netdataExecStartPost = pkgs.lib.toList netdataUnit.serviceConfig.ExecStartPost;
+              netdataSupplementaryGroups = pkgs.lib.toList netdataUnit.serviceConfig.SupplementaryGroups;
+              hermesNetdataMcp = hostConfig.services.hermes-agent.mcpServers.netdata;
+            in
+            pkgs.runCommand "netdata-service-config" { } ''
+              set -eu
+              test '${if netdataCfg.enable then "true" else "false"}' = 'true'
+              test '${netdataCfg.package.version}' = '2.10.2'
+              test '${if netdataCfg.enableAnalyticsReporting then "true" else "false"}' = 'false'
+              test '${netdataCfg.config.web."bind to"}' = '127.0.0.1'
+              test '${netdataCfg.config.plugins.freeipmi}' = 'no'
+              test '${netdataCfg.config.plugins."logs-management"}' = 'no'
+              test '${toString (builtins.elem "systemd-journal" netdataSupplementaryGroups)}' = '1'
+              test '${hostConfig.sops.secrets.netdata-claim-conf.sopsFile}' = '${./hosts/hermes/secrets/netdata-claim.conf}'
+              test '${toString (builtins.elem "netdata_claim_conf:${hostConfig.sops.secrets.netdata-claim-conf.path}" netdataLoadCredentials)}' = '1'
+              grep -q -- 'netdata-install-cloud-claim-conf' <<'EOF'
+              ${builtins.toString netdataUnit.serviceConfig.ExecStartPre}
+              EOF
+              grep -q -- 'netdata-cloud-claim' <<'EOF'
+              ${builtins.toString netdataExecStartPost}
+              EOF
+              test '${toString (builtins.elem "netdata-observe" systemPackages)}' = '1'
+              grep -q -- '/bin/nd-mcp-bridge' <<'EOF'
+              ${hermesNetdataMcp.command}
+              EOF
+              test '${builtins.concatStringsSep " " hermesNetdataMcp.args}' = 'ws://127.0.0.1:19999/mcp'
+              test '${toString (builtins.elem "systemd-journal" hermesSupplementaryGroups)}' = '1'
+              test -d '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d'
+              test -f '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d/nagios.conf'
+              grep -q -- "dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'" '${
+                hostConfig.environment.etc."netdata/conf.d".source
+              }/go.d/postgres.conf'
+              grep -q -- "collect_databases_matching: '*'" '${
+                hostConfig.environment.etc."netdata/conf.d".source
+              }/go.d/postgres.conf'
+              grep -q -- "autodetection_retry: 60" '${
+                hostConfig.environment.etc."netdata/conf.d".source
+              }/go.d/postgres.conf'
+              test '${
+                toString (builtins.any (user: user.name == "netdata") hostConfig.services.postgresql.ensureUsers)
+              }' = '1'
+              grep -q -- 'GRANT pg_monitor TO netdata' <<'EOF'
+              ${hostConfig.systemd.services.netdata-postgres-monitoring-setup.serviceConfig.ExecStart}
+              EOF
+              test '${hostConfig.systemd.services.netdata-postgres-monitoring-setup.serviceConfig.User}' = 'postgres'
+              grep -q -- '127.0.0.1' '${hostConfig.environment.etc."netdata/netdata.conf".source}'
+              grep -q -- '-D -c /etc/netdata/netdata.conf' <<'EOF'
+              ${netdataUnit.serviceConfig.ExecStart}
+              EOF
+              touch $out
+            '';
+
           hindsight-service-config =
             let
               hostConfig = self.nixosConfigurations.nixos-hermes.config;
@@ -296,9 +357,10 @@
               grep -q -- 'hindsight/config.json' <<'EOF'
               ${hindsightActivation}
               EOF
-              grep -q -- 'CREATE EXTENSION IF NOT EXISTS vector' <<'EOF'
-              ${pgInitExec}
-              EOF
+              grep -q -- 'CREATE EXTENSION IF NOT EXISTS vector' ${pgInitExec}
+              grep -q -- 'CREATE OR REPLACE FUNCTION public.schemas_with_pending_work' ${pgInitExec}
+              grep -q -- 'RETURN NEXT NULL::text' ${pgInitExec}
+              grep -q -- 'tenant_%' ${pgInitExec}
               grep -q -- '--embeddings' <<'EOF'
               ${llamaExec}
               EOF

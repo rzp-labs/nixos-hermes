@@ -99,6 +99,48 @@ let
     print(f"Hindsight LLM preflight OK: {model} listed by {models_url}")
   '';
 
+  postgresInitScript = pkgs.writeShellScript "hindsight-postgres-init" ''
+    set -euo pipefail
+    ${config.services.postgresql.package}/bin/psql -v ON_ERROR_STOP=1 -d hermes <<'SQL'
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+    CREATE OR REPLACE FUNCTION public.schemas_with_pending_work()
+    RETURNS SETOF text AS $$
+    DECLARE
+      r RECORD;
+      has_work BOOLEAN;
+    BEGIN
+      IF to_regclass('public.async_operations') IS NOT NULL THEN
+        SELECT EXISTS(
+          SELECT 1
+          FROM public.async_operations
+          WHERE status = 'pending'
+            AND task_payload IS NOT NULL
+          LIMIT 1
+        ) INTO has_work;
+        IF has_work THEN
+          RETURN NEXT NULL::text;
+        END IF;
+      END IF;
+
+      FOR r IN SELECT nspname FROM pg_namespace WHERE nspname LIKE 'tenant_%' LOOP
+        BEGIN
+          EXECUTE format(
+            $query$SELECT EXISTS(SELECT 1 FROM %I.async_operations WHERE status = 'pending' AND task_payload IS NOT NULL LIMIT 1)$query$,
+            r.nspname
+          ) INTO has_work;
+          IF has_work THEN
+            RETURN NEXT r.nspname;
+          END IF;
+        EXCEPTION WHEN OTHERS THEN
+          NULL;
+        END;
+      END LOOP;
+    END
+    $$ LANGUAGE plpgsql STABLE;
+    SQL
+  '';
+
   recoveryPreflightScript = pkgs.writeShellScript "hindsight-embed-recovery-preflight" ''
     set -euo pipefail
     export HINDSIGHT_API_LLM_API_KEY="$(cat "$CREDENTIALS_DIRECTORY/cliproxyapi-key")"
@@ -234,7 +276,7 @@ in
       serviceConfig = {
         Type = "oneshot";
         User = "postgres";
-        ExecStart = "${config.services.postgresql.package}/bin/psql -d hermes -c 'CREATE EXTENSION IF NOT EXISTS vector;'";
+        ExecStart = postgresInitScript;
       };
     };
 

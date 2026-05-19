@@ -11,6 +11,7 @@
     ./hindsight-embed.nix
     ./hindsight-memory.nix
     ./agentmemory.nix
+    ./netdata.nix
     ../../modules/system.nix
     ../../modules/packages.nix
     ../../modules/hermes-agent.nix

@@ -48,5 +48,15 @@
       mode = "0440";
     };
 
+    # Netdata Cloud claim.conf. Contains the cloud URL, claim token, and room
+    # binding; installed into /etc/netdata/claim.conf by netdata.service.
+    netdata-claim-conf = {
+      sopsFile = ./secrets/netdata-claim.conf;
+      format = "binary";
+      owner = "root";
+      group = "netdata";
+      mode = "0440";
+    };
+
   };
 }
