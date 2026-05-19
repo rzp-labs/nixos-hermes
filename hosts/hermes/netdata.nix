@@ -149,18 +149,17 @@ let
     '';
   };
 
-  netdataGoPluginConfig = pkgs.writeText "netdata-go.d.conf" ''
-    enabled: yes
-    default_run: yes
-
-    modules:
-      # This host runs PostgreSQL for local services, but Netdata autodiscovery
-      # cannot authenticate to it by default and spams the journal with failed
-      # probe attempts. Keep process/systemd-level PostgreSQL visibility from
-      # apps/systemd collectors, but disable the DB-specific go.d collector until
-      # explicit DB credentials/role are intentionally provisioned.
-      postgres: no
-      pgbouncer: no
+  netdataPostgresConfig = pkgs.writeText "netdata-postgres.conf" ''
+    # Netdata's documented PostgreSQL setup is a local `netdata` database role
+    # with pg_monitor (or pg_read_all_stats), then a file-managed go.d job.
+    # Use peer auth over the local Unix socket; no SOPS password is needed for
+    # this host-local collector.
+    update_every: 1
+    autodetection_retry: 0
+    jobs:
+      - name: local
+        dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'
+        collect_databases_matching: '*'
   '';
 
   netdataObserve = pkgs.writeShellApplication {
@@ -295,9 +294,19 @@ in
       # avoid one journal error per minute about a missing path.
       "scripts.d" = "${netdataPackage}/share/netdata/conf.d/scripts.d";
 
-      "go.d.conf" = netdataGoPluginConfig;
+      "go.d/postgres.conf" = netdataPostgresConfig;
     };
   };
+
+  services.postgresql.ensureUsers = [
+    {
+      name = "netdata";
+    }
+  ];
+
+  systemd.services.postgresql.postStart = lib.mkAfter ''
+    ${config.services.postgresql.package}/bin/psql -d postgres -tAc 'GRANT pg_monitor TO netdata;'
+  '';
 
   environment.systemPackages = [
     netdataPackage

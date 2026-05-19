@@ -4,3 +4,7 @@
 # hosts/hermes/secrets/ and tests/assets/ contain SOPS ciphertext which
 # triggers false positives on random byte sequences in base64.
 extend-exclude = [".gitignore", "hosts/hermes/secrets/", "tests/assets/", "assets/"]
+
+[default.extend-identifiers]
+# Netdata's MCP bridge package path uses the upstream abbreviation "nd".
+nd = "nd"
