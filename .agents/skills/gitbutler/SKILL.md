@@ -125,6 +125,29 @@ but branch move --unstack feature/logging
 
 **Note:** branch stack/tear-off operations use branch **names** (like `feature/frontend`) or branch CLI IDs, while commit reordering uses commit **IDs** (like `c3`). Do NOT use `but undo` to unstack — it may revert more than intended and lose commits.
 
+### Proven-bad applied branch: unapply first, then diagnose
+
+If runtime evidence proves that an applied GitButler branch is the regression — for example `nixos-rebuild --rollback` or unapplying a stack immediately restores the broken service — stop patching forward in the same dirty workspace.
+
+Preferred recovery:
+
+1. Preserve the evidence in the response or notes: which rollback/unapply action restored behavior, and what symptom disappeared.
+2. Unapply the suspect branch/stack from the workspace:
+
+   ```bash
+   but unapply <branch-or-stack> --status-after
+   ```
+
+3. If unapply leaves tiny unassigned residue caused by your attempted repair, inspect it with `but diff`; discard only residue that is clearly from the failed repair:
+
+   ```bash
+   but discard <change-id> --status-after
+   ```
+
+4. Only after the workspace is back to known-good should you decide whether to create a fresh narrower branch, revert a specific commit, or ask for direction.
+
+Do **not** keep surgically editing config after the user has provided decisive rollback evidence that the whole branch is bad. That is patch-forward tunnel vision and risks extending the outage.
+
 ### Stacked dependency / commit-lock recovery
 
 A **dependency lock** occurs when a file was originally committed on branch A, but you're trying to commit changes to it on branch B. Symptoms:
