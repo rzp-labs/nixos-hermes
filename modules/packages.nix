@@ -126,10 +126,10 @@ in
 
       agentmemory =
         let
-          version = "0.9.18";
+          version = "0.9.21";
           src = prev.fetchzip {
             url = "https://registry.npmjs.org/@agentmemory/agentmemory/-/agentmemory-${version}.tgz";
-            hash = "sha256-Gatch1lwR/8LvfBvGzcLwJSqPJy2U3kQtzV22l/iNnA=";
+            hash = "sha256-5uTldqCNGCXH3Wz1piBwCIfgh1MS1Vy+vsvFQNMlyPA=";
           };
           nodeModules = prev.stdenvNoCC.mkDerivation {
             pname = "agentmemory-node-modules";
@@ -155,7 +155,7 @@ in
 
             outputHashAlgo = "sha256";
             outputHashMode = "recursive";
-            outputHash = "sha256-dp6Mdug/p3nhTLw56cjmgWKinFl+Dfg9Cbgu79Mielw=";
+            outputHash = "sha256-UJ+sMdJFJ5GodKjuQVosKnIBXoMLWMmCg4RrbUCwW3Y=";
           };
         in
         prev.stdenvNoCC.mkDerivation {

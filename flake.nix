@@ -175,7 +175,7 @@
             pkgs.runCommand "agentmemory-service-config" { } ''
               set -eu
               test '${if hostConfig.services.agentmemory.enable then "true" else "false"}' = 'true'
-              test '${hostConfig.services.agentmemory.package.version}' = '0.9.18'
+              test '${hostConfig.services.agentmemory.package.version}' = '0.9.21'
               test '${hostConfig.services.agentmemory.package.passthru.iii-engine.version}' = '0.11.2'
               test '${env.HOME}' = '/var/lib/agentmemory'
               test '${env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
@@ -198,9 +198,16 @@
               test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
               test '${builtins.concatStringsSep " " hermesMcp.args}' = 'mcp'
               test '${hermesMcp.env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
-              grep -q -- 'agentmemory-hermes-plugin' <<'EOF'
+              grep -q -- 'agentmemory-hermes-plugin-0.9.21' <<'EOF'
               ${hermesPluginNames}
               EOF
+              agentmemory_plugin_path=$(grep -- 'agentmemory-hermes-plugin-0.9.21' <<'EOF'
+              ${hermesPluginNames}
+              EOF
+              )
+              for hook in prefetch sync_turn on_session_end on_pre_compress on_memory_write system_prompt_block; do
+                grep -q -- "- $hook" "$agentmemory_plugin_path/plugin.yaml"
+              done
               grep -qw -- 'agentmemory' <<'EOF'
               ${hermesEnabledPlugins}
               EOF
