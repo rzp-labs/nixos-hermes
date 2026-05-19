@@ -257,8 +257,18 @@
               test '${toString (builtins.elem "systemd-journal" hermesSupplementaryGroups)}' = '1'
               test -d '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d'
               test -f '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d/nagios.conf'
-              grep -q -- 'postgres: no' '${hostConfig.environment.etc."netdata/conf.d".source}/go.d.conf'
-              grep -q -- 'pgbouncer: no' '${hostConfig.environment.etc."netdata/conf.d".source}/go.d.conf'
+              grep -q -- "dsn: 'host=/var/run/postgresql dbname=postgres user=netdata'" '${
+                hostConfig.environment.etc."netdata/conf.d".source
+              }/go.d/postgres.conf'
+              grep -q -- "collect_databases_matching: '*'" '${
+                hostConfig.environment.etc."netdata/conf.d".source
+              }/go.d/postgres.conf'
+              test '${
+                toString (builtins.any (user: user.name == "netdata") hostConfig.services.postgresql.ensureUsers)
+              }' = '1'
+              grep -q -- 'GRANT pg_monitor TO netdata' <<'EOF'
+              ${hostConfig.systemd.services.postgresql.postStart}
+              EOF
               grep -q -- '127.0.0.1' '${hostConfig.environment.etc."netdata/netdata.conf".source}'
               grep -q -- '-D -c /etc/netdata/netdata.conf' <<'EOF'
               ${netdataUnit.serviceConfig.ExecStart}
