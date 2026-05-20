@@ -192,11 +192,107 @@ in
           };
         };
 
-      # llama-cpp b6981 (pinned nixpkgs) predates Gemma 4 arch support (requires >= b8637).
-      # Override with b8770 from nixpkgs-llama until FlakeHub's NixOS/nixpkgs/0 catches up.
-      llama-cpp = (nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system}).llama-cpp;
+      # Primary FlakeHub nixpkgs still lags a few host-required package versions.
+      # Pull narrow package overrides from nixpkgs-llama until FlakeHub catches up.
+      llamaPackageSet = nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system};
+      bun = final.llamaPackageSet.bun.overrideAttrs (
+        oldAttrs:
+        let
+          bunX86LinuxSrc = prev.fetchurl {
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip";
+            hash = "sha256-lR7iruhV8IWVruxiJSJqKY0/6oOj3NZGXAnLzN9+hI8=";
+          };
+        in
+        {
+          version = "1.3.14";
+          src = bunX86LinuxSrc;
+          passthru = oldAttrs.passthru // {
+            sources = oldAttrs.passthru.sources // {
+              "x86_64-linux" = bunX86LinuxSrc;
+            };
+          };
+        }
+      );
+      llama-cpp = final.llamaPackageSet.llama-cpp;
 
       llm-agents = prev.llm-agents // {
+        omp = prev.llm-agents.omp.overrideAttrs (
+          _oldAttrs:
+          let
+            napiArch =
+              {
+                x86_64 = "x64";
+                aarch64 = "arm64";
+              }
+              .${final.stdenv.hostPlatform.parsed.cpu.name}
+                or (throw "Unsupported OMP native addon CPU: ${final.stdenv.hostPlatform.parsed.cpu.name}");
+            napiPlatform = "${final.stdenv.hostPlatform.parsed.kernel.name}-${napiArch}";
+          in
+          {
+            # The upstream package builds a Bun standalone executable. With Bun
+            # 1.3.14 that ELF segfaults in glibc's loader after Nix autoPatchelf,
+            # before OMP userland code runs. OMP is a Node/Bun CLI, so package it
+            # in the usual runner shape instead: build only the Rust native addon
+            # and generated assets, then run the TypeScript entrypoint with Bun.
+            autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
+
+            buildPhase = ''
+              runHook preBuild
+
+              export LD_LIBRARY_PATH="${lib.makeLibraryPath [ final.stdenv.cc.cc.lib ]}"
+              export LIBCLANG_PATH="${final.libclang.lib}/lib"
+
+              echo "Building Rust native addon..."
+              cargo build --release -p pi-natives --target ${final.stdenv.hostPlatform.rust.rustcTarget} --target-dir target
+
+              mkdir -p packages/natives/native
+              cp target/${final.stdenv.hostPlatform.rust.rustcTarget}/release/libpi_natives.so \
+                packages/natives/native/pi_natives.${napiPlatform}.node
+
+              napiBin="$(pwd)/node_modules/.bin/napi"
+              if [ -x "$napiBin" ]; then
+                "$napiBin" build \
+                  --manifest-path crates/pi-natives/Cargo.toml \
+                  --package-json-path packages/natives/package.json \
+                  --platform \
+                  --no-js \
+                  --dts index.d.ts \
+                  -o packages/natives/native \
+                  --release \
+                  || echo "napi CLI post-processing failed; using cargo output directly"
+              fi
+
+              if [ -f packages/natives/scripts/gen-enums.ts ] && \
+                 [ -f packages/natives/native/index.d.ts ]; then
+                bun packages/natives/scripts/gen-enums.ts
+              fi
+
+              echo "Generating docs index..."
+              bun packages/coding-agent/scripts/generate-docs-index.ts
+
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+
+              mkdir -p $out/lib/omp/source $out/bin
+              cp -R package.json bun.lock node_modules packages $out/lib/omp/source/
+
+              makeWrapper ${final.bun}/bin/bun $out/bin/omp \
+                --add-flags "$out/lib/omp/source/packages/coding-agent/src/cli.ts" \
+                --set PI_SKIP_VERSION_CHECK 1 \
+                --prefix LD_LIBRARY_PATH : ${
+                  lib.makeLibraryPath [
+                    final.zlib
+                    final.stdenv.cc.cc.lib
+                  ]
+                }
+
+              runHook postInstall
+            '';
+          }
+        );
         but = prev.llm-agents.but.overrideAttrs (
           oldAttrs:
           let

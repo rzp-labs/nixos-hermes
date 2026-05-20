@@ -28,6 +28,7 @@
       bat # syntax-highlighted cat replacement
       glow # markdown renderer for the terminal
       yazi # terminal file manager
+      llm-agents.omp # terminal-based multi-model coding agent
     ];
   };
   users.users.hermes = {
