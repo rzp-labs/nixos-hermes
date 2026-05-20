@@ -168,11 +168,28 @@
   # MESSAGING_CWD is deprecated in 0.10.0 in favour of terminal.cwd in config.yaml.
   # The upstream nixosModules.nix still sets it unconditionally; UnsetEnvironment
   # removes it from the service environment so hermes sees only the config.yaml value.
-  systemd.services.hermes-agent.serviceConfig = {
-    UnsetEnvironment = [ "MESSAGING_CWD" ];
-    # Hermes gateway drain timeout is 180s; keep systemd's stop budget longer so
-    # rebuild/test restarts do not SIGKILL the gateway mid-drain.
-    TimeoutStopSec = 240;
+  systemd.services.hermes-agent = {
+    # The upstream module writes config.yaml under mutable HERMES_HOME during
+    # activation. Changes to that file do not necessarily change the systemd unit,
+    # so NixOS can refresh config without restarting the long-lived gateway. Force
+    # a restart when runtime config inputs change so provider/plugin/MCP cutovers
+    # actually reach the running process.
+    restartTriggers = [
+      (pkgs.writeText "hermes-agent-runtime-config-trigger.json" (
+        builtins.toJSON {
+          settings = config.services.hermes-agent.settings;
+          mcpServers = config.services.hermes-agent.mcpServers;
+          extraPlugins = map toString config.services.hermes-agent.extraPlugins;
+        }
+      ))
+    ];
+
+    serviceConfig = {
+      UnsetEnvironment = [ "MESSAGING_CWD" ];
+      # Hermes gateway drain timeout is 180s; keep systemd's stop budget longer so
+      # rebuild/test restarts do not SIGKILL the gateway mid-drain.
+      TimeoutStopSec = 240;
+    };
   };
 
   # opusCtypesShim patches ctypes.util.find_library("opus") at interpreter startup.

@@ -156,19 +156,32 @@ workaround, live in [`AGENTS.md`](AGENTS.md#first-install).
 
 ## Applying the Changes
 
-There is no automated deployment step yet. After pushing to `main`, apply changes
-manually:
+There is no automated deployment step yet. For host-affecting feature branches,
+use the branch itself as the deployment artifact:
+
+1. Push the branch with `but push` so a remote flake ref exists.
+2. Run `nixos-rebuild test` from the local checkout for fast live validation
+   without changing the boot default.
+3. Run the relevant local validation and post-test smoke checks; commit and push
+   any fixes.
+4. Open the PR once the pushed branch contains the validated local state.
+5. Run `nixos-rebuild switch` from the remote branch flake ref, not the local
+   checkout, so boot-default deployment proves the remote PR branch is
+   self-contained and in sync with what was tested locally.
 
 ```bash
 ssh admin@nixos-hermes
-sudo nixos-rebuild switch --flake github:nehpz/nixos-hermes#nixos-hermes
+sudo nixos-rebuild test --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
+sudo nixos-rebuild switch --flake \
+  'git+https://github.com/nehpz/nixos-hermes.git?ref=refs/heads/<branch>#nixos-hermes' -L
 ```
 
-Or build locally and push the closure:
+After the PR lands on `main`, future production rebuilds can use the canonical
+mainline flake:
 
 ```bash
-nixos-rebuild switch --flake .#nixos-hermes \
-  --target-host admin@nixos-hermes --use-remote-sudo
+ssh admin@nixos-hermes
+sudo nixos-rebuild switch --flake github:nehpz/nixos-hermes#nixos-hermes -L
 ```
 
 ---

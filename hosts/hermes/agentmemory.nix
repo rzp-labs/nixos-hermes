@@ -104,6 +104,17 @@ let
       }
     ];
   };
+  readyCheck = pkgs.writeShellScript "agentmemory-ready-check" ''
+    set -eu
+    for _ in $(seq 1 30); do
+      if ${pkgs.curl}/bin/curl -fsS --max-time 2 http://127.0.0.1:${toString restPort}/agentmemory/livez >/dev/null; then
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "agentmemory REST endpoints did not become ready" >&2
+    exit 1
+  '';
 in
 {
   options.services.agentmemory = {
@@ -136,10 +147,15 @@ in
           AGENTMEMORY_REQUIRE_HTTPS = "1";
         };
 
-        # Keep Hindsight as the active memory provider for the parallel
-        # evaluation; Agent Memory is installed as a discoverable provider and
-        # MCP server, but it must not influence live memory until later gates.
-        settings.memory.provider = lib.mkDefault "hindsight";
+        # Agent Memory is now the active Hermes memory provider. Hindsight was
+        # useful as a spike, but its retain/consolidation path proved too costly
+        # and fragile to keep in the live assistant loop. Hermes' MemoryProvider
+        # loader selects user-installed providers by their directory name under
+        # $HERMES_HOME/plugins, and the NixOS module installs extraPlugins as
+        # nix-managed-* symlinks. The plugin's internal name remains
+        # "agentmemory" for the general plugin manager, but memory.provider must
+        # match the symlink name for load_memory_provider() to find it.
+        settings.memory.provider = "nix-managed-agentmemory-hermes-plugin";
 
         mcpServers.agentmemory = {
           command = lib.getExe cfg.package;
@@ -180,7 +196,14 @@ in
         path = [
           pkgs.bash
           pkgs.coreutils
+          pkgs.curl
           cfg.package.passthru.iii-engine
+        ];
+
+        restartTriggers = [
+          iiiConfig
+          readyCheck
+          cfg.package
         ];
 
         serviceConfig = {
@@ -194,6 +217,7 @@ in
           StateDirectoryMode = "0700";
           WorkingDirectory = stateDir;
           ExecStart = "${lib.getExe cfg.package.passthru.iii-engine} --config ${iiiConfig}";
+          ExecStartPost = readyCheck;
           Restart = "on-failure";
           RestartSec = "5s";
 

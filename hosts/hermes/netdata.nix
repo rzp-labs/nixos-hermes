@@ -312,7 +312,8 @@ in
       # configDir entries, so expose the packaged empty/example directory to
       # avoid one journal error per minute about a missing path.
       "scripts.d" = "${netdataPackage}/share/netdata/conf.d/scripts.d";
-
+    }
+    // lib.optionalAttrs config.services.postgresql.enable {
       "go.d/postgres.conf" = netdataPostgresConfig;
     };
   };
@@ -322,13 +323,13 @@ in
     args = [ "ws://127.0.0.1:19999/mcp" ];
   };
 
-  services.postgresql.ensureUsers = [
+  services.postgresql.ensureUsers = lib.mkIf config.services.postgresql.enable [
     {
       name = "netdata";
     }
   ];
 
-  systemd.services.netdata-postgres-monitoring-setup = {
+  systemd.services.netdata-postgres-monitoring-setup = lib.mkIf config.services.postgresql.enable {
     description = "Grant PostgreSQL monitoring privileges to Netdata";
     wantedBy = [ "multi-user.target" ];
     after = [

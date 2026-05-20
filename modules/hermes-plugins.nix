@@ -43,11 +43,11 @@ let
   agentmemorySource = pkgs.fetchFromGitHub {
     owner = "rohitg00";
     repo = "agentmemory";
-    rev = "9061da56d5caf9499f0bfb66f5cc35e648c1fb25";
-    hash = "sha256-5YjuZI/C8SfZCRhbpUZDLg+ZpBq+arlPFSPdk6X1pV8=";
+    rev = "1838f4d74c3a0accdd3764e7a8ec155cc140b831";
+    hash = "sha256-1fNOAfTnFC7ElRsZbCtTK0ix4HQC1ld4+aDT97Qn4iA=";
   };
 
-  agentmemoryHermesPlugin = pkgs.runCommand "agentmemory-hermes-plugin-0.9.18" { } ''
+  agentmemoryHermesPlugin = pkgs.runCommand "agentmemory-hermes-plugin-0.9.21" { } ''
     mkdir -p $out
     cp -R ${agentmemorySource}/integrations/hermes/. $out/
   '';

@@ -1,4 +1,4 @@
-# Host-local Hindsight memory substrate enablement and Hermes provider wiring.
+# Retired host-local Hindsight memory substrate.
 {
   config,
   lib,
@@ -21,10 +21,11 @@ let
   hindsightConfig = pkgs.writeText "hermes-hindsight-config.json" (builtins.toJSON providerConfig);
 in
 {
-  services.hindsightMemory = {
-    enable = true;
-    llama.enable = true;
-  };
+  # Keep the module imported so rollback/history remain readable, but do not
+  # start Hindsight or its llama.cpp embedding server by default. Agent Memory
+  # is the active memory backend now; Hindsight can be re-enabled explicitly for
+  # forensics or migration if needed.
+  services.hindsightMemory.enable = lib.mkDefault false;
 
   services.hermes-agent = lib.mkIf cfg.enable {
     settings.memory.provider = "hindsight";

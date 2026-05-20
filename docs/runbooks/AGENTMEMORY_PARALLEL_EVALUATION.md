@@ -20,7 +20,7 @@ The service runs as the `agentmemory` system user with persistent state under:
 
 Package pins:
 
-- `@agentmemory/agentmemory`: `0.9.18`
+- `@agentmemory/agentmemory`: `0.9.21`
 - `iii-engine`: `0.11.2`
 
 The Nix package uses the npm release tarball plus a fixed-output `node_modules` derivation. This intentionally avoids `npx -y`, global npm installs, or network-at-runtime package resolution in the systemd path.
@@ -57,7 +57,7 @@ Hindsight remains the Hermes memory provider during this milestone.
 
 Hermes integration is declarative and split into two non-mutating paths:
 
-- `modules/hermes-plugins.nix` pins the Agent Memory source commit matching npm `0.9.18` (`9061da56d5caf9499f0bfb66f5cc35e648c1fb25`) and installs `integrations/hermes` through `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
+- `modules/hermes-plugins.nix` pins the Agent Memory source commit matching npm `0.9.21` (`1838f4d74c3a0accdd3764e7a8ec155cc140b831`) and installs `integrations/hermes` through `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
 - `hosts/hermes/agentmemory.nix` configures `services.hermes-agent.mcpServers.agentmemory` to run the pinned local package directly:
 
   ```nix
