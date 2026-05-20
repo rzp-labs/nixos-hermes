@@ -192,9 +192,28 @@ in
           };
         };
 
-      # llama-cpp b6981 (pinned nixpkgs) predates Gemma 4 arch support (requires >= b8637).
-      # Override with b8770 from nixpkgs-llama until FlakeHub's NixOS/nixpkgs/0 catches up.
-      llama-cpp = (nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system}).llama-cpp;
+      # Primary FlakeHub nixpkgs still lags a few host-required package versions.
+      # Pull narrow package overrides from nixpkgs-llama until FlakeHub catches up.
+      llamaPackageSet = nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system};
+      bun = final.llamaPackageSet.bun.overrideAttrs (
+        oldAttrs:
+        let
+          bunX86LinuxSrc = prev.fetchurl {
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip";
+            hash = "sha256-lR7iruhV8IWVruxiJSJqKY0/6oOj3NZGXAnLzN9+hI8=";
+          };
+        in
+        {
+          version = "1.3.14";
+          src = bunX86LinuxSrc;
+          passthru = oldAttrs.passthru // {
+            sources = oldAttrs.passthru.sources // {
+              "x86_64-linux" = bunX86LinuxSrc;
+            };
+          };
+        }
+      );
+      llama-cpp = final.llamaPackageSet.llama-cpp;
 
       llm-agents = prev.llm-agents // {
         but = prev.llm-agents.but.overrideAttrs (

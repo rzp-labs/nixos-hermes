@@ -184,8 +184,8 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
   - `NixOS/nixpkgs` as `nixpkgs-llama`
     - Temporarily pinned to a raw GitHub commit because the primary FlakeHub
       `NixOS/nixpkgs/0` input lagged package versions needed by this host.
-    - Currently supplies `llama-cpp` with Gemma 4 support until FlakeHub
-      `NixOS/nixpkgs/0` catches up.
+    - Currently supplies `bun` and `llama-cpp` with Gemma 4 support until
+      FlakeHub `NixOS/nixpkgs/0` catches up.
     - Netdata currently uses this package set as a base plus a scoped package
       override in `hosts/hermes/netdata.nix` because both pinned nixpkgs inputs
       lag Netdata Cloud's required stable agent release.
