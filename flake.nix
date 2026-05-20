@@ -198,20 +198,18 @@
               test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
               test '${builtins.concatStringsSep " " hermesMcp.args}' = 'mcp'
               test '${hermesMcp.env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
-              grep -q -- 'agentmemory-hermes-plugin-0.9.21' <<'EOF'
-              ${hermesPluginNames}
-              EOF
-              agentmemory_plugin_path=$(grep -- 'agentmemory-hermes-plugin-0.9.21' <<'EOF'
+              agentmemory_plugin_path=$(grep -- 'agentmemory-hermes-plugin-0.9.21' <<'EOF' | head -n 1
               ${hermesPluginNames}
               EOF
               )
+              test -n "$agentmemory_plugin_path"
               for hook in prefetch sync_turn on_session_end on_pre_compress on_memory_write system_prompt_block; do
                 grep -q -- "- $hook" "$agentmemory_plugin_path/plugin.yaml"
               done
               grep -qw -- 'agentmemory' <<'EOF'
               ${hermesEnabledPlugins}
               EOF
-              test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'agentmemory'
+              test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'nix-managed-agentmemory-hermes-plugin'
               test '${service.ProtectSystem}' = 'strict'
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
               grep -q -- '/bin/iii --config ' <<'EOF'
@@ -225,6 +223,12 @@
               EOF
               grep -q -- 'agentmemory-iii-config.yaml' <<'EOF'
               ${service.ExecStart}
+              EOF
+              grep -q -- 'agentmemory-ready-check' <<'EOF'
+              ${toString service.ExecStartPost}
+              EOF
+              grep -q -- '${pkgs.curl}/bin' <<'EOF'
+              ${env.PATH}
               EOF
               case '${service.ExecStart}' in
                 *'/bin/agentmemory --tools core'*)
