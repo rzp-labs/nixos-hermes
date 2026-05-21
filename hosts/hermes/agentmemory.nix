@@ -16,6 +16,13 @@ let
   enginePort = 49134;
   yaml = pkgs.formats.yaml { };
   agentmemoryRoot = "${cfg.package}/lib/node_modules/@agentmemory/agentmemory";
+  startScript = pkgs.writeShellScript "agentmemory-start" ''
+    set -eu
+    ${lib.optionalString cfg.llm.enable ''
+      export OPENAI_API_KEY="$(${pkgs.coreutils}/bin/cat "$CREDENTIALS_DIRECTORY/cliproxyapi-key")"
+    ''}
+    exec ${lib.getExe cfg.package.passthru.iii-engine} --config ${iiiConfig}
+  '';
   iiiConfig = yaml.generate "agentmemory-iii-config.yaml" {
     workers = [
       {
@@ -121,14 +128,65 @@ in
     enable = lib.mkEnableOption "Agent Memory local parallel-observer service";
 
     package = lib.mkPackageOption pkgs "agentmemory" { };
+
+    llm = {
+      enable = lib.mkEnableOption "Agent Memory LLM enrichment through the LAN OpenAI-compatible CLIProxyAPI";
+
+      baseUrl = lib.mkOption {
+        type = lib.types.str;
+        default = "http://10.0.0.102:8317";
+        description = ''
+          Root URL for Agent Memory's OpenAI-compatible provider. Agent Memory
+          0.9.21 appends /v1/chat/completions itself, so this must not include
+          /v1.
+        '';
+      };
+
+      model = lib.mkOption {
+        type = lib.types.str;
+        default = "gpt-5.4-mini";
+        description = "OpenAI-compatible chat model routed by CLIProxyAPI.";
+      };
+
+      timeoutMs = lib.mkOption {
+        type = lib.types.ints.positive;
+        default = 120000;
+        description = "Agent Memory LLM request timeout in milliseconds.";
+      };
+
+      embeddingProvider = lib.mkOption {
+        type = lib.types.str;
+        default = "local";
+        description = ''
+          Embedding provider used while OPENAI_API_KEY is present for chat LLM
+          calls. Keep this explicit so adding the proxy key does not
+          accidentally route embedding traffic through CLIProxyAPI.
+        '';
+      };
+    };
   };
 
   config = lib.mkMerge [
     {
       services.agentmemory.enable = lib.mkDefault true;
+      services.agentmemory.llm.enable = lib.mkDefault true;
     }
 
     (lib.mkIf cfg.enable {
+      assertions = [
+        {
+          assertion =
+            !cfg.llm.enable
+            || lib.hasPrefix "http://" cfg.llm.baseUrl
+            || lib.hasPrefix "https://" cfg.llm.baseUrl;
+          message = "services.agentmemory.llm.baseUrl must start with http:// or https://.";
+        }
+        {
+          assertion = !cfg.llm.enable || !(lib.hasSuffix "/v1" cfg.llm.baseUrl);
+          message = "services.agentmemory.llm.baseUrl must be the proxy root; Agent Memory appends /v1/chat/completions itself.";
+        }
+      ];
+
       users.users.agentmemory = {
         isSystemUser = true;
         group = "agentmemory";
@@ -176,10 +234,10 @@ in
           AGENTMEMORY_URL = "http://127.0.0.1:${toString restPort}";
           AGENTMEMORY_VIEWER_URL = "http://127.0.0.1:${toString viewerPort}";
           AGENTMEMORY_ALLOW_AGENT_SDK = "false";
-          AGENTMEMORY_AUTO_COMPRESS = "false";
-          GRAPH_EXTRACTION_ENABLED = "false";
-          CONSOLIDATION_ENABLED = "false";
-          AGENTMEMORY_INJECT_CONTEXT = "false";
+          AGENTMEMORY_AUTO_COMPRESS = "true";
+          GRAPH_EXTRACTION_ENABLED = "true";
+          CONSOLIDATION_ENABLED = "true";
+          AGENTMEMORY_INJECT_CONTEXT = "true";
           AGENTMEMORY_TOOLS = "core";
           AGENTMEMORY_III_VERSION = cfg.package.passthru.iii-engine.version;
           III_REST_PORT = toString restPort;
@@ -188,6 +246,13 @@ in
           III_VIEWER_PORT = toString viewerPort;
           III_ENGINE_URL = "ws://127.0.0.1:${toString enginePort}";
           VIEWER_ALLOWED_ORIGINS = "http://127.0.0.1:${toString restPort},http://127.0.0.1:${toString viewerPort},http://localhost:${toString restPort},http://localhost:${toString viewerPort}";
+        }
+        // lib.optionalAttrs cfg.llm.enable {
+          OPENAI_BASE_URL = cfg.llm.baseUrl;
+          OPENAI_MODEL = cfg.llm.model;
+          AGENTMEMORY_LLM_TIMEOUT_MS = toString cfg.llm.timeoutMs;
+          OPENAI_TIMEOUT_MS = toString cfg.llm.timeoutMs;
+          EMBEDDING_PROVIDER = cfg.llm.embeddingProvider;
         };
 
         # iii-exec launches configured commands via `sh -c`; keep the
@@ -203,6 +268,7 @@ in
         restartTriggers = [
           iiiConfig
           readyCheck
+          startScript
           cfg.package
         ];
 
@@ -216,8 +282,11 @@ in
           ];
           StateDirectoryMode = "0700";
           WorkingDirectory = stateDir;
-          ExecStart = "${lib.getExe cfg.package.passthru.iii-engine} --config ${iiiConfig}";
+          ExecStart = startScript;
           ExecStartPost = readyCheck;
+          LoadCredential = lib.optionals cfg.llm.enable [
+            "cliproxyapi-key:${config.sops.secrets.cliproxyapi-key.path}"
+          ];
           Restart = "on-failure";
           RestartSec = "5s";
 
