@@ -56,15 +56,24 @@ EMBEDDING_PROVIDER=local
 
 Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the proxy root (`http://10.0.0.102:8317`), not `http://10.0.0.102:8317/v1`.
 
-The CLIProxyAPI key is passed via systemd credentials:
+The CLIProxyAPI key is a raw SOPS secret readable only by the `agentmemory`
+service user:
 
 ```nix
-LoadCredential = [
-  "cliproxyapi-key:${config.sops.secrets.cliproxyapi-key.path}"
-];
+sops.secrets.cliproxyapi-key = {
+  owner = "agentmemory";
+  group = "agentmemory";
+  mode = "0400";
+};
 ```
 
-The startup wrapper reads `$CREDENTIALS_DIRECTORY/cliproxyapi-key` and exports `OPENAI_API_KEY` only inside the service process. The key must not appear in Nix store-backed environment files or generated config.
+The startup wrapper waits briefly for `/run/secrets/cliproxyapi-key`, reads it
+inside the service process, and exports `OPENAI_API_KEY` there. Do not use
+`LoadCredential` for this secret: during `nixos-rebuild test`/activation,
+systemd can attempt to load credentials while sops-nix is rotating the
+`/run/secrets` symlink, producing a transient `status=243/CREDENTIALS` start
+failure that fails the rebuild even if auto-restart succeeds seconds later. The
+key must not appear in Nix store-backed environment files or generated config.
 
 ## Runtime flags
 
@@ -127,7 +136,7 @@ For changes that affect activation/deployment mechanics, use the heavier VM swit
 After an authorized host switch/restart, prove runtime separately from build proof:
 
 ```bash
-systemctl show agentmemory.service -p ActiveState -p MainPID -p LoadCredential -p Environment --no-pager
+systemctl show agentmemory.service -p ActiveState -p MainPID -p Environment --no-pager
 systemctl status agentmemory.service --no-pager -l
 journalctl -u agentmemory.service -n 160 --no-pager | grep -Ei 'llm|openai|noop|provider|consolid|graph|compress|inject|error|timeout'
 curl -fsS http://127.0.0.1:3111/agentmemory/livez

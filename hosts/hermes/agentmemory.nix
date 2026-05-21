@@ -19,7 +19,17 @@ let
   startScript = pkgs.writeShellScript "agentmemory-start" ''
     set -eu
     ${lib.optionalString cfg.llm.enable ''
-      export OPENAI_API_KEY="$(${pkgs.coreutils}/bin/cat "$CREDENTIALS_DIRECTORY/cliproxyapi-key")"
+      for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
+        if [ -r ${config.sops.secrets.cliproxyapi-key.path} ]; then
+          export OPENAI_API_KEY="$(${pkgs.coreutils}/bin/cat ${config.sops.secrets.cliproxyapi-key.path})"
+          break
+        fi
+        sleep 1
+      done
+      if [ -z "''${OPENAI_API_KEY:-}" ]; then
+        echo "cliproxyapi-key was not readable after 30s" >&2
+        exit 1
+      fi
     ''}
     exec ${lib.getExe cfg.package.passthru.iii-engine} --config ${iiiConfig}
   '';
@@ -284,9 +294,6 @@ in
           WorkingDirectory = stateDir;
           ExecStart = startScript;
           ExecStartPost = readyCheck;
-          LoadCredential = lib.optionals cfg.llm.enable [
-            "cliproxyapi-key:${config.sops.secrets.cliproxyapi-key.path}"
-          ];
           Restart = "on-failure";
           RestartSec = "5s";
 

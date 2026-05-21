@@ -244,7 +244,6 @@
               env = unit.environment;
               service = unit.serviceConfig;
               stateDirectories = pkgs.lib.toList service.StateDirectory;
-              loadCredentials = pkgs.lib.toList service.LoadCredential;
               hermesMcp = hostConfig.services.hermes-agent.mcpServers.agentmemory;
               hermesPluginNames = builtins.concatStringsSep "\n" (
                 map toString hostConfig.services.hermes-agent.extraPlugins
@@ -283,9 +282,9 @@
               test '${env.III_ENGINE_URL}' = 'ws://127.0.0.1:49134'
               test '${service.User}' = 'agentmemory'
               test '${service.Group}' = 'agentmemory'
-              grep -q -- 'cliproxyapi-key:${hostConfig.sops.secrets.cliproxyapi-key.path}' <<'EOF'
-              ${builtins.concatStringsSep "\n" loadCredentials}
-              EOF
+              test '${hostConfig.sops.secrets.cliproxyapi-key.owner}' = 'agentmemory'
+              test '${hostConfig.sops.secrets.cliproxyapi-key.group}' = 'agentmemory'
+              test '${hostConfig.sops.secrets.cliproxyapi-key.mode}' = '0400'
               test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
               test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
               test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
@@ -307,6 +306,8 @@
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
               grep -q -- '/bin/iii --config ' '${service.ExecStart}'
               grep -q -- 'export OPENAI_API_KEY=' '${service.ExecStart}'
+              grep -q -- '${hostConfig.sops.secrets.cliproxyapi-key.path}' '${service.ExecStart}'
+              grep -q -- 'was not readable after 30s' '${service.ExecStart}'
               ! grep -q -- 'OPENAI_API_KEY=' <<'EOF'
               ${builtins.concatStringsSep "\n" (builtins.attrValues env)}
               EOF
