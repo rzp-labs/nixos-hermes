@@ -259,6 +259,9 @@
               test '${toString hostConfig.services.agentmemory.llm.timeoutMs}' = '120000'
               test '${hostConfig.services.agentmemory.llm.embeddingProvider}' = 'local'
               test '${hostConfig.services.agentmemory.package.version}' = '0.9.21'
+              test -d '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory/node_modules/@xenova/transformers'
+              test -f '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory/node_modules/sharp/build/Release/sharp-linux-x64.node'
+              (cd '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory' && ${pkgs.nodejs}/bin/node --input-type=module -e 'import("@xenova/transformers").then((m) => { if (typeof m.pipeline !== "function") process.exit(1); }).catch((err) => { console.error(err); process.exit(1); })')
               test '${hostConfig.services.agentmemory.package.passthru.iii-engine.version}' = '0.11.2'
               test '${env.HOME}' = '/var/lib/agentmemory'
               test '${env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
