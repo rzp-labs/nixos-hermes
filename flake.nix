@@ -21,13 +21,13 @@
     llm-agents.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    repowise-nix.url = "path:./packages/repowise-nix";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-
       nixpkgs-llama,
       determinate,
       sops-nix,
@@ -176,8 +176,7 @@
               test -x '${hostPkgs.repowise}/bin/repowise'
               test -f '${./packages/repowise-nix/flake.nix}'
               test -f '${./packages/repowise-nix/patches/repowise-nix-language-support.patch}'
-              grep -q -- '../packages/repowise-nix/package.nix' '${./modules/packages.nix}'
-              grep -q -- '../packages/repowise-nix/wrapper.nix' '${./modules/packages.nix}'
+              grep -q -- 'inputs.repowise-nix.packages' '${./modules/packages.nix}'
               test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
               find '${hostPkgs.repowise}/lib' -path '*/repowise/cli/editor_setup.py' -exec grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '{}' ';'
               '${hostPkgs.repowise}/bin/repowise' --help >/dev/null

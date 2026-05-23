@@ -124,10 +124,8 @@ in
         };
       };
 
-      repowise = prev.callPackage ../packages/repowise-nix/package.nix { };
-      repowise-nix = prev.callPackage ../packages/repowise-nix/wrapper.nix {
-        repowise = final.repowise;
-      };
+      repowise = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise;
+      repowise-nix = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise-nix;
 
       agentmemory =
         let
