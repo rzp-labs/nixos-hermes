@@ -267,7 +267,7 @@ After first install:
   belongs in `services.hermes-agent.extraPythonPackages`, not in this `sitecustomize.py`.
 - Exposes shims via the overlay (e.g. `pkgs.opusCtypesShim`) so service modules
   can consume them without coupling to this file directly.
-- Owns the Nix-packaged Repowise CLI and `repowise-nixos-hermes` wrapper. See
+- Owns the standalone Repowise Nix flake (`packages/repowise-nix`) and `repowise-nix` wrapper. See
   `docs/guides/REPOWISE.md` for runtime usage and credential boundaries.
 
 ### `modules/system.nix`

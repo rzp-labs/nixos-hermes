@@ -39,7 +39,7 @@
     bun
     fh
     repowise
-    repowise-nixos-hermes
+    repowise-nix
     llm-agents.but
     uv # Python package manager — required for hindsight-embed setup
   ];

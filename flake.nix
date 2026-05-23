@@ -159,7 +159,7 @@
             vm-switch-smoke
             ;
 
-          repowise-agent-tooling =
+          repowise-nix-tooling =
             let
               hostConfig = self.nixosConfigurations.nixos-hermes.config;
               hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
@@ -170,33 +170,35 @@
                 map toString hostConfig.environment.systemPackages
               );
             in
-            pkgs.runCommand "repowise-agent-tooling" { } ''
+            pkgs.runCommand "repowise-nix-tooling" { } ''
               set -eu
-              test '${hostPkgs.repowise.version}' = '0.10.0-nixos-hermes'
+              test '${hostPkgs.repowise.version}' = '0.10.0-repowise-nix'
               test -x '${hostPkgs.repowise}/bin/repowise'
-              test -f '${./modules/patches/repowise-nix-language-support.patch}'
-              grep -q -- 'patches/repowise-nix-language-support.patch' '${./modules/packages.nix}'
-              test -x '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              test -f '${./packages/repowise-nix/flake.nix}'
+              test -f '${./packages/repowise-nix/patches/repowise-nix-language-support.patch}'
+              grep -q -- '../packages/repowise-nix/package.nix' '${./modules/packages.nix}'
+              grep -q -- '../packages/repowise-nix/wrapper.nix' '${./modules/packages.nix}'
+              test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
               find '${hostPkgs.repowise}/lib' -path '*/repowise/cli/editor_setup.py' -exec grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '{}' ';'
               '${hostPkgs.repowise}/bin/repowise' --help >/dev/null
               mkdir repo
-              REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes' --help >/dev/null
-              grep -q -- 'docs/spikes/repowise-nix/artifacts/\*\*' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
-              grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
-              grep -q -- '--no-claude-md' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
-              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
-              grep -q -- 'generate|refresh' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
-              grep -q -- 'gemini-3.1-flash-lite-preview' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nix}/bin/repowise-nix' --help >/dev/null
+              grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_EDITOR_SETUP' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- '--no-claude-md' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'generate|refresh' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
               ${hermesExtraPackages}
               EOF
-              grep -q -- '${hostPkgs.repowise-nixos-hermes}' <<'EOF'
+              grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
               ${hermesExtraPackages}
               EOF
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
               ${systemPackages}
               EOF
-              grep -q -- '${hostPkgs.repowise-nixos-hermes}' <<'EOF'
+              grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
               ${systemPackages}
               EOF
               touch $out

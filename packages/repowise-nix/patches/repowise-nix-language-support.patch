@@ -271,7 +271,7 @@ diff --git a/tests/unit/ingestion/test_parser.py b/tests/unit/ingestion/test_par
 index 50bf5ef..12af97e 100644
 --- a/tests/unit/ingestion/test_parser.py
 +++ b/tests/unit/ingestion/test_parser.py
-@@ -1395,12 +1395,62 @@ class TestLuauParser:
+@@ -1395,12 +1395,63 @@ class TestLuauParser:
          assert any("ReplicatedStorage" in m for m in raw)
 
 
@@ -296,10 +296,11 @@ index 50bf5ef..12af97e 100644
 +'''
 +
 +
-+pytest.importorskip("tree_sitter_nix", reason="run `uv sync --all-packages`")
-+
-+
 +class TestNixParser:
++    @pytest.fixture(scope="class", autouse=True)
++    def require_tree_sitter_nix(self):
++        pytest.importorskip("tree_sitter_nix", reason="run `uv sync --all-packages`")
++
 +    def test_finds_attr_binding_symbols(self, parser: ASTParser) -> None:
 +        fi = _make_file_info("hosts/hermes/agentmemory.nix", "nix")
 +        result = parser.parse_file(fi, NIX_SOURCE)

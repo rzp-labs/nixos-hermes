@@ -37,7 +37,7 @@
       linear-cli
       fh
       repowise
-      repowise-nixos-hermes
+      repowise-nix
       pkgs.llm-agents.omp
       pkgs.llm-agents.agent-browser
       mcp-nixos
