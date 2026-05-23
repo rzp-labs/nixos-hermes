@@ -58,8 +58,8 @@
     };
 
     # API keys merged into $HERMES_HOME/.env at activation.
-    # Current keys: ELEVENLABS_API_KEY, DISCORD_BOT_TOKEN, OPENROUTER_API_KEY
-    # DISCORD_ALLOWED_USERS is in environment above (non-secret).
+    # Current keys include Discord/ElevenLabs/OpenRouter/Linear/GitHub plus scoped
+    # tool credentials such as GEMINI_API_KEY and REPOWISE_OPENAI_*.
     environmentFiles = [ config.sops.secrets."hermes-env".path ];
 
     settings = {

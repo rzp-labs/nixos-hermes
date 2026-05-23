@@ -185,6 +185,10 @@
               REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nix}/bin/repowise-nix' --help >/dev/null
               grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_OPENAI_API_KEY' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_OPENAI_BASE_URL' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'OPENAI_API_KEY="$REPOWISE_OPENAI_API_KEY"' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'OPENAI_BASE_URL="$REPOWISE_OPENAI_BASE_URL"' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_EDITOR_SETUP' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- '--no-claude-md' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nix}/bin/repowise-nix'

@@ -42,6 +42,15 @@ writeShellApplication {
       set +f
     fi
 
+    # Repowise's OpenAI-compatible provider reads generic OPENAI_* env vars.
+    # Keep host/Hermes credentials scoped, then adapt them only for this subprocess.
+    if [ -n "''${REPOWISE_OPENAI_API_KEY:-}" ]; then
+      export OPENAI_API_KEY="$REPOWISE_OPENAI_API_KEY"
+    fi
+    if [ -n "''${REPOWISE_OPENAI_BASE_URL:-}" ]; then
+      export OPENAI_BASE_URL="$REPOWISE_OPENAI_BASE_URL"
+    fi
+
     cd "$repo"
     case "$command" in
       generate|refresh)

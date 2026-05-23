@@ -55,6 +55,10 @@
             REPOWISE_REPO="$PWD/repo" '${repowise-nix}/bin/repowise-nix' --help >/dev/null
             grep -q -- '.repowise/\*\*' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'REPOWISE_OPENAI_API_KEY' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'REPOWISE_OPENAI_BASE_URL' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'OPENAI_API_KEY="$REPOWISE_OPENAI_API_KEY"' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'OPENAI_BASE_URL="$REPOWISE_OPENAI_BASE_URL"' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_EDITOR_SETUP' '${repowise-nix}/bin/repowise-nix'
             grep -q -- '--no-claude-md' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${repowise-nix}/bin/repowise-nix'

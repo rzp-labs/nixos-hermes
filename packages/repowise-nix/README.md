@@ -39,6 +39,8 @@ The wrapper has generic defaults and exposes repo preferences through environmen
 | `REPOWISE_PROVIDER` | `openai` | LLM provider for generation. |
 | `REPOWISE_MODEL` | `gemini-3.1-flash-lite-preview` | LLM model for generation. |
 | `REPOWISE_EMBEDDER` | `gemini` | Embedding provider. |
+| `REPOWISE_OPENAI_API_KEY` | unset | Scoped OpenAI-compatible API key; mapped to `OPENAI_API_KEY` only inside the Repowise subprocess. |
+| `REPOWISE_OPENAI_BASE_URL` | unset | Scoped OpenAI-compatible base URL; mapped to `OPENAI_BASE_URL` only inside the Repowise subprocess. |
 | `REPOWISE_COVERAGE` | `0.20` | Generation coverage. |
 | `REPOWISE_CONCURRENCY` | `4` | Generation concurrency. |
 
