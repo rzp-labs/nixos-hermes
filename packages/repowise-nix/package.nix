@@ -72,6 +72,7 @@ py.buildPythonApplication {
     gitpython
     pyyaml
     lancedb
+    pandas
     click
     rich
     watchdog
