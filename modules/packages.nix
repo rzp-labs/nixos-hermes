@@ -124,6 +124,9 @@ in
         };
       };
 
+      repowise = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise;
+      repowise-nix = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise-nix;
+
       agentmemory =
         let
           version = "0.9.21";

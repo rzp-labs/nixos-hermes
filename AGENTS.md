@@ -34,7 +34,7 @@ nixos-hermes/
 │   ├── system.nix                       # locale, tz, networking, packages, sudo
 │   ├── hermes-agent.nix                 # hermes service declaration
 │   ├── hermes-plugins.nix               # declarative Hermes plugin packages/enables
-│   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds)
+│   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds, Repowise)
 │   └── users.nix                        # immutable user + SSH key declarations
 ```
 
@@ -267,6 +267,8 @@ After first install:
   belongs in `services.hermes-agent.extraPythonPackages`, not in this `sitecustomize.py`.
 - Exposes shims via the overlay (e.g. `pkgs.opusCtypesShim`) so service modules
   can consume them without coupling to this file directly.
+- Owns the standalone Repowise Nix flake (`packages/repowise-nix`) and `repowise-nix` wrapper. See
+  `docs/guides/REPOWISE.md` for runtime usage and credential boundaries.
 
 ### `modules/system.nix`
 

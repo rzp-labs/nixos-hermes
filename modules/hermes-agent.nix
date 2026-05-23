@@ -25,6 +25,7 @@
     # fh: official FlakeHub CLI for flake input discovery and conversion.
     # omp: terminal-based multi-model coding agent from numtide/llm-agents.nix overlay.
     # agent-browser: headless browser automation CLI from llm-agents.nix (built from source, auto-updated daily).
+    # repowise: local repo-intelligence/orientation map for nixos-hermes work.
     extraPackages = with pkgs; [
       playwright-driver.browsers
       ffmpeg
@@ -35,6 +36,8 @@
       bun
       linear-cli
       fh
+      repowise
+      repowise-nix
       pkgs.llm-agents.omp
       pkgs.llm-agents.agent-browser
       mcp-nixos
@@ -55,8 +58,8 @@
     };
 
     # API keys merged into $HERMES_HOME/.env at activation.
-    # Current keys: ELEVENLABS_API_KEY, DISCORD_BOT_TOKEN, OPENROUTER_API_KEY
-    # DISCORD_ALLOWED_USERS is in environment above (non-secret).
+    # Current keys include Discord/ElevenLabs/OpenRouter/Linear/GitHub plus scoped
+    # tool credentials such as GEMINI_API_KEY and REPOWISE_OPENAI_*.
     environmentFiles = [ config.sops.secrets."hermes-env".path ];
 
     settings = {

@@ -21,13 +21,14 @@
     llm-agents.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    repowise-nix.url = "path:./packages/repowise-nix";
+    repowise-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-
       nixpkgs-llama,
       determinate,
       sops-nix,
@@ -158,6 +159,64 @@
             activation-github-auth
             vm-switch-smoke
             ;
+
+          repowise-nix-tooling =
+            let
+              hostConfig = self.nixosConfigurations.nixos-hermes.config;
+              hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
+              hermesExtraPackages = builtins.concatStringsSep "\n" (
+                map toString hostConfig.services.hermes-agent.extraPackages
+              );
+              systemPackages = builtins.concatStringsSep "\n" (
+                map toString hostConfig.environment.systemPackages
+              );
+            in
+            pkgs.runCommand "repowise-nix-tooling" { } ''
+              set -eu
+              test '${hostPkgs.repowise.version}' = '0.10.0-repowise-nix'
+              test -x '${hostPkgs.repowise}/bin/repowise'
+              test -f '${./packages/repowise-nix/flake.nix}'
+              test -f '${./packages/repowise-nix/patches/repowise-nix-language-support.patch}'
+              grep -q -- 'inputs.repowise-nix.packages' '${./modules/packages.nix}'
+              test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${hostPkgs.repowise}/${hostPkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
+              '${hostPkgs.repowise}/bin/repowise' --help >/dev/null
+              mkdir repo
+              REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nix}/bin/repowise-nix' --help >/dev/null
+              grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_OPENAI_API_KEY' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_OPENAI_BASE_URL' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'OPENAI_API_KEY="$REPOWISE_OPENAI_API_KEY"' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'OPENAI_BASE_URL="$REPOWISE_OPENAI_BASE_URL"' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_EDITOR_SETUP' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- '--no-claude-md' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- "repowise-nix: REPOWISE_REPO='\$repo' does not exist" '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'read -r -a extra_excludes_arr' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'repowise reindex --embedder' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- '"\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'repowise search "\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              if REPOWISE_REPO="$PWD/missing" '${hostPkgs.repowise-nix}/bin/repowise-nix' status 2>err; then
+                echo 'expected missing REPOWISE_REPO to fail' >&2
+                exit 1
+              fi
+              grep -q -- "repowise-nix: REPOWISE_REPO='$PWD/missing' does not exist" err
+              grep -q -- 'generate|refresh' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- '${hostPkgs.repowise}' <<'EOF'
+              ${hermesExtraPackages}
+              EOF
+              grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
+              ${hermesExtraPackages}
+              EOF
+              grep -q -- '${hostPkgs.repowise}' <<'EOF'
+              ${systemPackages}
+              EOF
+              grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
+              ${systemPackages}
+              EOF
+              touch $out
+            '';
 
           agentmemory-service-config =
             let

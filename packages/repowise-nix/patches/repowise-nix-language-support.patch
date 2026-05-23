@@ -1,0 +1,471 @@
+diff --git a/packages/core/src/repowise/core/ingestion/languages/registry.py b/packages/core/src/repowise/core/ingestion/languages/registry.py
+index d094c90..29b1ece 100644
+--- a/packages/core/src/repowise/core/ingestion/languages/registry.py
++++ b/packages/core/src/repowise/core/ingestion/languages/registry.py
+@@ -884,6 +884,34 @@ _SPECS: tuple[LanguageSpec, ...] = (
+         ),
+         color_hex="#DC322F",
+     ),
++    LanguageSpec(
++        tag="nix",
++        display_name="Nix",
++        extensions=frozenset({".nix"}),
++        is_infra=True,
++        grammar_package="tree_sitter_nix",
++        scm_file="nix.scm",
++        entry_point_patterns=("flake.nix", "default.nix"),
++        manifest_files=("flake.nix", "default.nix"),
++        lock_files=("flake.lock",),
++        builtin_calls=frozenset(
++            {
++                "abort",
++                "baseNameOf",
++                "builtins",
++                "derivation",
++                "dirOf",
++                "fetchTarball",
++                "import",
++                "isNull",
++                "map",
++                "removeAttrs",
++                "throw",
++                "toString",
++            }
++        ),
++        color_hex="#7EBAE4",
++    ),
+     # -----------------------------------------------------------------
+     # Config / data / markup languages (passthrough — no AST)
+     # -----------------------------------------------------------------
+diff --git a/packages/core/src/repowise/core/ingestion/models.py b/packages/core/src/repowise/core/ingestion/models.py
+index 47bb95b..b86e7d2 100644
+--- a/packages/core/src/repowise/core/ingestion/models.py
++++ b/packages/core/src/repowise/core/ingestion/models.py
+@@ -34,6 +34,7 @@ LanguageTag = Literal[
+     "kotlin",
+     "scala",
+     "luau",
++    "nix",
+     "shell",
+     "yaml",
+     "json",
+diff --git a/packages/core/src/repowise/core/ingestion/parser.py b/packages/core/src/repowise/core/ingestion/parser.py
+index 50f15ef..8f0faca 100644
+--- a/packages/core/src/repowise/core/ingestion/parser.py
++++ b/packages/core/src/repowise/core/ingestion/parser.py
+@@ -501,6 +501,17 @@ LANGUAGE_CONFIGS: dict[str, LanguageConfig] = {
+         parent_class_types=frozenset(),
+         entry_point_patterns=["init.luau", "init.lua"],
+     ),
++    "nix": LanguageConfig(
++        symbol_node_types={
++            "binding": "constant",
++        },
++        import_node_types=["binding", "apply_expression"],
++        export_node_types=[],
++        visibility_fn=public_by_default,
++        parent_extraction="none",
++        parent_class_types=frozenset(),
++        entry_point_patterns=["flake.nix", "default.nix"],
++    ),
+ }
+
+
+@@ -796,7 +807,7 @@ class ASTParser:
+             return []
+
+         imports: list[Import] = []
+-        seen_raws: set[str] = set()
++        seen_raws: set[tuple[str, str]] = set()
+
+         for capture_dict in _run_query(query, tree.root_node):  # type: ignore[attr-defined]
+             stmt_nodes = capture_dict.get("import.statement", [])
+@@ -807,14 +818,16 @@ class ASTParser:
+
+             stmt_node = stmt_nodes[0]
+             raw = _node_text(stmt_node, src).strip()
+-            if raw in seen_raws:
+-                continue
+-            seen_raws.add(raw)
+
+             module_text = _node_text(module_nodes[0], src).strip().strip("\"'` ")
+             if not module_text:
+                 continue
+
++            dedup_key = (raw, module_text)
++            if dedup_key in seen_raws:
++                continue
++            seen_raws.add(dedup_key)
++
+             # Language-specific import name + binding extraction
+             imported_names, bindings = extract_import_bindings(stmt_node, src, file_info.language)
+             is_relative = module_text.startswith(".") or module_text.startswith("./")
+diff --git a/packages/core/src/repowise/core/ingestion/queries/nix.scm b/packages/core/src/repowise/core/ingestion/queries/nix.scm
+new file mode 100644
+index 0000000..68889aa
+--- /dev/null
++++ b/packages/core/src/repowise/core/ingestion/queries/nix.scm
+@@ -0,0 +1,36 @@
++; =============================================================================
++; repowise — Nix symbol and import queries
++;
++; Minimal support targets first-order structure, not full Nix evaluation:
++; module function heads, attr bindings, imports lists, direct path imports, and
++; coarse application/call sites.
++; =============================================================================
++
++; Attribute bindings are the closest useful first-order symbol for NixOS modules:
++; services.foo.enable, systemd.services.bar, flake inputs, let bindings, etc.
++(binding
++  attrpath: (attrpath) @symbol.name
++) @symbol.def
++
++; NixOS module imports = [ ./x.nix ../y.nix ].
++(binding
++  attrpath: (attrpath (identifier) @import.attr)
++  expression: (list_expression
++    (path_expression (path_fragment) @import.module))
++  (#eq? @import.attr "imports")
++) @import.statement
++
++; Direct path imports: import ./x.nix
++(apply_expression
++  function: (variable_expression (identifier) @call.target)
++  argument: (path_expression (path_fragment) @import.module)
++  (#eq? @call.target "import")
++) @import.statement
++
++; Coarse Nix function/application calls.
++(apply_expression
++  function: [
++    (variable_expression (identifier) @call.target)
++    (select_expression) @call.target
++  ]
++) @call.site
+diff --git a/packages/core/src/repowise/core/ingestion/resolvers/__init__.py b/packages/core/src/repowise/core/ingestion/resolvers/__init__.py
+index 142b724..2e5d07b 100644
+--- a/packages/core/src/repowise/core/ingestion/resolvers/__init__.py
++++ b/packages/core/src/repowise/core/ingestion/resolvers/__init__.py
+@@ -11,6 +11,7 @@ from .generic import resolve_generic_import
+ from .go import resolve_go_import
+ from .kotlin import resolve_kotlin_import
+ from .luau import resolve_luau_import
++from .nix import resolve_nix_import
+ from .php import resolve_php_import
+ from .python import resolve_python_import
+ from .ruby import resolve_ruby_import
+@@ -36,6 +37,7 @@ _RESOLVERS: dict[str, ResolverFn] = {
+     "swift": resolve_swift_import,
+     "scala": resolve_scala_import,
+     "php": resolve_php_import,
++    "nix": resolve_nix_import,
+ }
+
+
+diff --git a/packages/core/src/repowise/core/ingestion/resolvers/nix.py b/packages/core/src/repowise/core/ingestion/resolvers/nix.py
+new file mode 100644
+index 0000000..355d22b
+--- /dev/null
++++ b/packages/core/src/repowise/core/ingestion/resolvers/nix.py
+@@ -0,0 +1,41 @@
++"""Nix import resolution for relative module paths."""
++
++from __future__ import annotations
++
++from pathlib import PurePosixPath
++import posixpath
++
++from .context import ResolverContext
++from .generic import resolve_generic_import
++
++
++def resolve_nix_import(
++    module_path: str, importer_path: str, ctx: ResolverContext
++) -> str | None:
++    """Resolve common Nix path imports.
++
++    NixOS modules most often import relative paths such as ``./hardware.nix`` or
++    ``../../modules/users.nix``. Directory imports conventionally resolve to a
++    ``default.nix`` below that directory. For non-path module strings, fall back
++    to Repowise's generic stem resolver.
++    """
++    module_path = module_path.strip().strip('"\'` ')
++    if not module_path:
++        return None
++
++    if module_path.startswith("./") or module_path.startswith("../"):
++        base = PurePosixPath(importer_path).parent
++        target = base.joinpath(PurePosixPath(module_path))
++        normalized = posixpath.normpath(target.as_posix())
++
++        candidates = [normalized]
++        if not normalized.endswith(".nix"):
++            candidates.append(f"{normalized}.nix")
++            candidates.append(f"{normalized}/default.nix")
++
++        for candidate in candidates:
++            collapsed = posixpath.normpath(candidate)
++            if collapsed in ctx.path_set:
++                return collapsed
++
++    return resolve_generic_import(module_path, importer_path, ctx)
+diff --git a/pyproject.toml b/pyproject.toml
+index 7d82336..3028999 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -49,6 +49,7 @@ dependencies = [
+     "tree-sitter-scala>=0.23,<1",
+     "tree-sitter-php>=0.23,<1",
+     "tree-sitter-luau>=1.2,<2",
++    "tree-sitter-nix==0.1.0",
+     # Dependency graph
+     "networkx>=3.3,<4",
+     "scipy>=1.11,<2",
+diff --git a/tests/unit/ingestion/test_nix_resolver.py b/tests/unit/ingestion/test_nix_resolver.py
+new file mode 100644
+index 0000000..a7dc494
+--- /dev/null
++++ b/tests/unit/ingestion/test_nix_resolver.py
+@@ -0,0 +1,40 @@
++"""Unit tests for Nix import resolution."""
++
++from __future__ import annotations
++
++import networkx as nx
++
++from repowise.core.ingestion.resolvers.context import ResolverContext
++from repowise.core.ingestion.resolvers.nix import resolve_nix_import
++
++
++def _ctx(paths: set[str]) -> ResolverContext:
++    stem_map: dict[str, list[str]] = {}
++    for path in paths:
++        stem = path.rsplit("/", 1)[-1].removesuffix(".nix")
++        stem_map.setdefault(stem, []).append(path)
++    return ResolverContext(path_set=paths, stem_map=stem_map, graph=nx.DiGraph())
++
++
++def test_resolves_relative_nix_module_path() -> None:
++    ctx = _ctx({"hosts/hermes/default.nix", "hosts/hermes/hardware.nix"})
++
++    assert (
++        resolve_nix_import("./hardware.nix", "hosts/hermes/default.nix", ctx)
++        == "hosts/hermes/hardware.nix"
++    )
++
++
++def test_resolves_parent_relative_module_path() -> None:
++    ctx = _ctx({"hosts/hermes/default.nix", "modules/hermes-agent.nix"})
++
++    assert (
++        resolve_nix_import("../../modules/hermes-agent.nix", "hosts/hermes/default.nix", ctx)
++        == "modules/hermes-agent.nix"
++    )
++
++
++def test_resolves_directory_default_nix() -> None:
++    ctx = _ctx({"flake.nix", "hosts/hermes/default.nix"})
++
++    assert resolve_nix_import("./hosts/hermes", "flake.nix", ctx) == "hosts/hermes/default.nix"
+diff --git a/tests/unit/ingestion/test_parser.py b/tests/unit/ingestion/test_parser.py
+index 50bf5ef..12af97e 100644
+--- a/tests/unit/ingestion/test_parser.py
++++ b/tests/unit/ingestion/test_parser.py
+@@ -1395,12 +1395,63 @@ class TestLuauParser:
+         assert any("ReplicatedStorage" in m for m in raw)
+
+
++NIX_SOURCE = b'''{ config, lib, pkgs, ... }:
++
++let
++  cfg = config.services.agentmemory;
++  startScript = pkgs.writeShellScript "agentmemory-start" ''
++    exec ${pkgs.nodejs}/bin/node ${cfg.package}/dist/index.mjs
++  '';
++in
++{
++  imports = [
++    ./hardware.nix
++    ../../modules/hermes-agent.nix
++  ];
++
++  services.agentmemory.enable = lib.mkDefault true;
++  systemd.services.agentmemory.serviceConfig.ExecStart = startScript;
++  configFile = import ./config.nix;
++}
++'''
++
++
++class TestNixParser:
++    @pytest.fixture(scope="class", autouse=True)
++    def require_tree_sitter_nix(self):
++        pytest.importorskip("tree_sitter_nix", reason="run `uv sync --all-packages`")
++
++    def test_finds_attr_binding_symbols(self, parser: ASTParser) -> None:
++        fi = _make_file_info("hosts/hermes/agentmemory.nix", "nix")
++        result = parser.parse_file(fi, NIX_SOURCE)
++        names = {s.name for s in result.symbols}
++        assert "cfg" in names
++        assert "services.agentmemory.enable" in names
++        assert "systemd.services.agentmemory.serviceConfig.ExecStart" in names
++
++    def test_parses_module_and_direct_imports(self, parser: ASTParser) -> None:
++        fi = _make_file_info("hosts/hermes/agentmemory.nix", "nix")
++        result = parser.parse_file(fi, NIX_SOURCE)
++        modules = [i.module_path for i in result.imports]
++        assert "./hardware.nix" in modules
++        assert "../../modules/hermes-agent.nix" in modules
++        assert "./config.nix" in modules
++        assert all(i.is_relative for i in result.imports)
++
++    def test_extracts_coarse_call_targets(self, parser: ASTParser) -> None:
++        fi = _make_file_info("hosts/hermes/agentmemory.nix", "nix")
++        result = parser.parse_file(fi, NIX_SOURCE)
++        targets = {c.target_name for c in result.calls}
++        assert "pkgs.writeShellScript" in targets
++        assert "lib.mkDefault" in targets
++
++
+ class TestLanguageConfigs:
+     def test_all_supported_languages_have_config(self) -> None:
+         expected = {
+             "python", "typescript", "javascript", "go", "rust",
+             "java", "cpp", "c", "kotlin", "ruby", "csharp", "swift",
+-            "scala", "php", "luau",
++            "scala", "php", "luau", "nix",
+         }
+         for lang in expected:
+             assert lang in LANGUAGE_CONFIGS, f"Missing config for {lang}"
+diff --git a/tests/unit/ingestion/test_traverser.py b/tests/unit/ingestion/test_traverser.py
+index b4e1545..c63a0b9 100644
+--- a/tests/unit/ingestion/test_traverser.py
++++ b/tests/unit/ingestion/test_traverser.py
+@@ -44,9 +44,12 @@ class TestLanguageDetection:
+     def test_special_dockerfile(self, tmp_path: Path) -> None:
+         assert _detect_language(tmp_path / "Dockerfile") == "dockerfile"
+
+-    def test_special_makefile(self, tmp_path: Path) -> None:
++    def test_makefile_extension(self, tmp_path: Path) -> None:
+         assert _detect_language(tmp_path / "Makefile") == "makefile"
+
++    def test_nix_extension(self, tmp_path: Path) -> None:
++        assert _detect_language(tmp_path / "module.nix") == "nix"
++
+     def test_unknown_extension(self, tmp_path: Path) -> None:
+         assert _detect_language(tmp_path / "binary.elf") == "unknown"
+
+diff --git a/uv.lock b/uv.lock
+index 6994d93..5b258ea 100644
+--- a/uv.lock
++++ b/uv.lock
+@@ -3075,6 +3075,7 @@ dependencies = [
+     { name = "tree-sitter-javascript" },
+     { name = "tree-sitter-kotlin" },
+     { name = "tree-sitter-luau" },
++    { name = "tree-sitter-nix" },
+     { name = "tree-sitter-php" },
+     { name = "tree-sitter-python" },
+     { name = "tree-sitter-ruby" },
+@@ -3164,6 +3165,7 @@ requires-dist = [
+     { name = "tree-sitter-javascript", specifier = ">=0.23,<1" },
+     { name = "tree-sitter-kotlin", specifier = ">=1,<2" },
+     { name = "tree-sitter-luau", specifier = ">=1.2,<2" },
++    { name = "tree-sitter-nix", specifier = "==0.1.0" },
+     { name = "tree-sitter-php", specifier = ">=0.23,<1" },
+     { name = "tree-sitter-python", specifier = ">=0.23,<1" },
+     { name = "tree-sitter-ruby", specifier = ">=0.23,<1" },
+@@ -4047,6 +4049,21 @@ wheels = [
+     { url = "https://files.pythonhosted.org/packages/1a/df/db574405f592f1f4f039dc83db8545d634b68481ce0c457bbab26e155a4a/tree_sitter_luau-1.2.0-cp39-abi3-win_arm64.whl", hash = "sha256:37e9a2e2dd9795800c98c160eabcfed9a90a25a80e2f207658902b0444a40440", size = 31300, upload-time = "2024-12-22T22:42:45.64Z" },
+ ]
+
++[[package]]
++name = "tree-sitter-nix"
++version = "0.1.0"
++source = { registry = "https://pypi.org/simple" }
++sdist = { url = "https://files.pythonhosted.org/packages/4d/c2/10d8983cfaf9c336befe77bb0ef4e058b05ca2208589288e84cb83691e15/tree_sitter_nix-0.1.0.tar.gz", hash = "sha256:b551fd00fbbac92f300fa941f3c41b661f290c141559de0f690d5509d9ac3cb0", size = 45118, upload-time = "2025-02-20T03:55:14.869Z" }
++wheels = [
++    { url = "https://files.pythonhosted.org/packages/ec/eb/8f88901abe6718121584a2a9aae10e27e56297c604e39033ad5d4f4b3dd6/tree_sitter_nix-0.1.0-cp310-abi3-macosx_10_9_x86_64.whl", hash = "sha256:be2cb442e8aa71ba1be9c18928c1e61ba7c421b7adb18139152b6b753eaf34a5", size = 26396, upload-time = "2025-02-20T03:55:03.309Z" },
++    { url = "https://files.pythonhosted.org/packages/1b/73/76d81928226298d1c36bac819b028364d8aa1abc3eead9f8b054917c99fd/tree_sitter_nix-0.1.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:1c666eb12f5fc326a4a12f1cb555d93da6e5934947b038a95829cd2533e662d7", size = 26705, upload-time = "2025-02-20T03:55:05.887Z" },
++    { url = "https://files.pythonhosted.org/packages/94/7f/cf33867470f717267e60b717ae1085ccd7fae48681406b3605a216f48fd3/tree_sitter_nix-0.1.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:25df7005d9188968347d97f5980b5fd780000f340ce1e5db198447bf208c8871", size = 43938, upload-time = "2025-02-20T03:55:07.615Z" },
++    { url = "https://files.pythonhosted.org/packages/6d/2f/0dc49a8b3683bdf9cf8542d0d4eb2c508e9f01f4234574f4ad7f859a1d0b/tree_sitter_nix-0.1.0-cp310-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:58c07f788bc6d24b7a90aff49431de57c3933c5c54d1008125da2073f1bc45de", size = 43798, upload-time = "2025-02-20T03:55:09.082Z" },
++    { url = "https://files.pythonhosted.org/packages/de/ff/f205cb90d539ee4b877f4dd7a8b90a36a6f29c22a8188da7e43bab0aa1ec/tree_sitter_nix-0.1.0-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:1694d9d012026bd2c9ac57812a43c438458177dad35c549022cf93b4539f0023", size = 43168, upload-time = "2025-02-20T03:55:10.016Z" },
++    { url = "https://files.pythonhosted.org/packages/3f/a9/27e60501f6a219d01c747b0ae9abf1db23dc3f7e8582e327d2016503a13a/tree_sitter_nix-0.1.0-cp310-abi3-win_amd64.whl", hash = "sha256:9294bf94c2ece0b4e64c32f0de57b9ac861577bae81fac2dfabf954cfd25700e", size = 27649, upload-time = "2025-02-20T03:55:11.371Z" },
++    { url = "https://files.pythonhosted.org/packages/a5/61/53e710982ad9e01d98ec9ffe800a13dc993725b7f242e92123f1c6e2dd5a/tree_sitter_nix-0.1.0-cp310-abi3-win_arm64.whl", hash = "sha256:0e0f32ff065fb70c637fce5e6b5b19ae7e4b5a5d3de8ea01133df7ca1a425b0a", size = 25800, upload-time = "2025-02-20T03:55:12.809Z" },
++]
++
+ [[package]]
+ name = "tree-sitter-php"
+ version = "0.24.1"
+diff --git a/packages/cli/src/repowise/cli/editor_setup.py b/packages/cli/src/repowise/cli/editor_setup.py
+--- a/packages/cli/src/repowise/cli/editor_setup.py
++++ b/packages/cli/src/repowise/cli/editor_setup.py
+@@ -7,6 +7,8 @@
+ """
+
+ from __future__ import annotations
++
++import os
+
+ from collections.abc import Iterable
+ from dataclasses import dataclass, field
+@@ -87,6 +89,8 @@
+         disabled_project_files=frozenset(disabled_project_files or ()),
+         prompt_for_project_files=prompt_for_project_files,
+     )
++    if os.environ.get("REPOWISE_DISABLE_EDITOR_SETUP") == "1":
++        return options
+     for integration in _resolve_integrations(integrations):
+         options = integration.configure_options(console_obj, options)
+     return options
+@@ -101,6 +105,9 @@
+     integrations: tuple[EditorSetupIntegration, ...] | None = None,
+ ) -> None:
+     """Write common MCP config and project-local editor files."""
++
++    if os.environ.get("REPOWISE_DISABLE_EDITOR_SETUP") == "1":
++        return
+
+     from repowise.cli.mcp_config import save_mcp_config
+
+@@ -120,6 +127,8 @@
+ ) -> None:
+     """Register editor clients with repowise MCP and hooks where supported."""
+
++    if os.environ.get("REPOWISE_DISABLE_EDITOR_SETUP") == "1":
++        return
+     for integration in _resolve_integrations(integrations):
+         integration.register_client(console_obj, repo_path)
+
+@@ -133,6 +142,8 @@
+ ) -> None:
+     """Refresh editor-managed project files without rewriting common MCP config."""
+
++    if os.environ.get("REPOWISE_DISABLE_EDITOR_SETUP") == "1":
++        return
+     resolved_options = options or EditorSetupOptions()
+     for integration in _resolve_integrations(integrations):
+         integration.refresh_project_files(console_obj, repo_path, resolved_options)
+
+diff --git a/packages/cli/src/repowise/cli/main.py b/packages/cli/src/repowise/cli/main.py
+--- a/packages/cli/src/repowise/cli/main.py
++++ b/packages/cli/src/repowise/cli/main.py
+@@ -1,6 +1,8 @@
+ """repowise CLI — codebase intelligence for developers and AI."""
+
+ from __future__ import annotations
++
++import os
+
+ import click
+
+@@ -36,7 +38,10 @@
+     # silent, idempotent — only writes when there is something to change.
+     # Skipped when invoked as the augment subcommand itself (hot path on
+     # every Grep/Glob/Bash) — `augment_hook.main` handles that case.
+-    if ctx.invoked_subcommand != "augment":
++    if (
++        ctx.invoked_subcommand != "augment"
++        and os.environ.get("REPOWISE_DISABLE_EDITOR_SETUP") != "1"
++    ):
+         try:
+             from repowise.cli.editor_integrations.claude_config import migrate_claude_code_hooks

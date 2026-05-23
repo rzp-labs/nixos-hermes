@@ -696,6 +696,22 @@
         "type": "github"
       }
     },
+    "repowise-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "path": "./packages/repowise-nix",
+        "type": "path"
+      },
+      "original": {
+        "path": "./packages/repowise-nix",
+        "type": "path"
+      },
+      "parent": []
+    },
     "root": {
       "inputs": {
         "determinate": "determinate",
@@ -706,6 +722,7 @@
         "nixos-anywhere": "nixos-anywhere",
         "nixpkgs": "nixpkgs_3",
         "nixpkgs-llama": "nixpkgs-llama",
+        "repowise-nix": "repowise-nix",
         "sops-nix": "sops-nix"
       }
     },
