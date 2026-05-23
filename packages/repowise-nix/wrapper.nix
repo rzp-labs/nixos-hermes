@@ -30,16 +30,12 @@ writeShellApplication {
     )
 
     if [ -n "''${REPOWISE_EXTRA_EXCLUDES:-}" ]; then
-      set -f
-      old_ifs="$IFS"
-      IFS=':'
-      for exclude in $REPOWISE_EXTRA_EXCLUDES; do
+      IFS=':' read -r -a extra_excludes_arr <<< "$REPOWISE_EXTRA_EXCLUDES"
+      for exclude in "''${extra_excludes_arr[@]}"; do
         if [ -n "$exclude" ]; then
           common_excludes+=(--exclude "$exclude")
         fi
       done
-      IFS="$old_ifs"
-      set +f
     fi
 
     # Repowise's OpenAI-compatible provider reads generic OPENAI_* env vars.
@@ -49,6 +45,11 @@ writeShellApplication {
     fi
     if [ -n "''${REPOWISE_OPENAI_BASE_URL:-}" ]; then
       export OPENAI_BASE_URL="$REPOWISE_OPENAI_BASE_URL"
+    fi
+
+    if [ ! -d "$repo" ]; then
+      echo "repowise-nix: REPOWISE_REPO='$repo' does not exist" >&2
+      exit 66
     fi
 
     cd "$repo"
@@ -73,14 +74,14 @@ writeShellApplication {
           "$@"
         ;;
       reindex)
-        exec repowise reindex --embedder "''${REPOWISE_EMBEDDER:-gemini}" "$repo" "$@"
+        exec repowise reindex --embedder "''${REPOWISE_EMBEDDER:-gemini}" "$@" .
         ;;
       search)
         if [ "$#" -eq 0 ]; then
           echo "usage: repowise-nix search QUERY [--mode fulltext|semantic|symbol] [--limit N]" >&2
           exit 64
         fi
-        exec repowise search "$@" "$repo"
+        exec repowise search "$@" .
         ;;
       *)
         exec repowise "$command" "$@"

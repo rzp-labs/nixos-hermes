@@ -62,6 +62,16 @@
             grep -q -- 'REPOWISE_EDITOR_SETUP' '${repowise-nix}/bin/repowise-nix'
             grep -q -- '--no-claude-md' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- "repowise-nix: REPOWISE_REPO='\$repo' does not exist" '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'read -r -a extra_excludes_arr' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'repowise reindex --embedder' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- '"\$@" .' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- 'repowise search "\$@" .' '${repowise-nix}/bin/repowise-nix'
+            if REPOWISE_REPO="$PWD/missing" '${repowise-nix}/bin/repowise-nix' status 2>err; then
+              echo 'expected missing REPOWISE_REPO to fail' >&2
+              exit 1
+            fi
+            grep -q -- "repowise-nix: REPOWISE_REPO='$PWD/missing' does not exist" err
             touch $out
           '';
         }

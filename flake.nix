@@ -192,6 +192,16 @@
               grep -q -- 'REPOWISE_EDITOR_SETUP' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- '--no-claude-md' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- "repowise-nix: REPOWISE_REPO='\$repo' does not exist" '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'read -r -a extra_excludes_arr' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'repowise reindex --embedder' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- '"\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              grep -q -- 'repowise search "\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+              if REPOWISE_REPO="$PWD/missing" '${hostPkgs.repowise-nix}/bin/repowise-nix' status 2>err; then
+                echo 'expected missing REPOWISE_REPO to fail' >&2
+                exit 1
+              fi
+              grep -q -- "repowise-nix: REPOWISE_REPO='$PWD/missing' does not exist" err
               grep -q -- 'generate|refresh' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
               ${hermesExtraPackages}
