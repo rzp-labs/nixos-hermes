@@ -159,6 +159,49 @@
             vm-switch-smoke
             ;
 
+          repowise-agent-tooling =
+            let
+              hostConfig = self.nixosConfigurations.nixos-hermes.config;
+              hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
+              hermesExtraPackages = builtins.concatStringsSep "\n" (
+                map toString hostConfig.services.hermes-agent.extraPackages
+              );
+              systemPackages = builtins.concatStringsSep "\n" (
+                map toString hostConfig.environment.systemPackages
+              );
+            in
+            pkgs.runCommand "repowise-agent-tooling" { } ''
+              set -eu
+              test '${hostPkgs.repowise.version}' = '0.10.0-nixos-hermes'
+              test -x '${hostPkgs.repowise}/bin/repowise'
+              test -f '${./modules/patches/repowise-nix-language-support.patch}'
+              grep -q -- 'patches/repowise-nix-language-support.patch' '${./modules/packages.nix}'
+              test -x '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              find '${hostPkgs.repowise}/lib' -path '*/repowise/cli/editor_setup.py' -exec grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '{}' ';'
+              '${hostPkgs.repowise}/bin/repowise' --help >/dev/null
+              mkdir repo
+              REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes' --help >/dev/null
+              grep -q -- 'docs/spikes/repowise-nix/artifacts/\*\*' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              grep -q -- '--no-claude-md' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              grep -q -- 'generate|refresh' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              grep -q -- 'gemini-3.1-flash-lite-preview' '${hostPkgs.repowise-nixos-hermes}/bin/repowise-nixos-hermes'
+              grep -q -- '${hostPkgs.repowise}' <<'EOF'
+              ${hermesExtraPackages}
+              EOF
+              grep -q -- '${hostPkgs.repowise-nixos-hermes}' <<'EOF'
+              ${hermesExtraPackages}
+              EOF
+              grep -q -- '${hostPkgs.repowise}' <<'EOF'
+              ${systemPackages}
+              EOF
+              grep -q -- '${hostPkgs.repowise-nixos-hermes}' <<'EOF'
+              ${systemPackages}
+              EOF
+              touch $out
+            '';
+
           agentmemory-service-config =
             let
               hostConfig = self.nixosConfigurations.nixos-hermes.config;

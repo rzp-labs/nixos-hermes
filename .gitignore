@@ -14,6 +14,7 @@
 [Ll]ib64
 [Ll]ocal
 [Ss]cripts
+
 # Sensitive data
 
 .env/
@@ -28,6 +29,8 @@
 .env.production.local
 .secrets/
 extra-files/
+docs/reviews/*
+!docs/reviews/.gitkeep
 
 #
 
@@ -95,3 +98,6 @@ Icon
 # Nix build result symlinks
 result
 result-*
+
+# Local Repowise index/wiki state
+.repowise/

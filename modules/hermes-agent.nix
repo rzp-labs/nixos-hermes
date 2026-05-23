@@ -25,6 +25,7 @@
     # fh: official FlakeHub CLI for flake input discovery and conversion.
     # omp: terminal-based multi-model coding agent from numtide/llm-agents.nix overlay.
     # agent-browser: headless browser automation CLI from llm-agents.nix (built from source, auto-updated daily).
+    # repowise: local repo-intelligence/orientation map for nixos-hermes work.
     extraPackages = with pkgs; [
       playwright-driver.browsers
       ffmpeg
@@ -35,6 +36,8 @@
       bun
       linear-cli
       fh
+      repowise
+      repowise-nixos-hermes
       pkgs.llm-agents.omp
       pkgs.llm-agents.agent-browser
       mcp-nixos
