@@ -68,7 +68,7 @@ Do not commit keys. Use environment or sops-managed runtime files only.
 
 ## Index hygiene
 
-The wrapper always excludes generic transient paths and disables Repowise's editor setup layer by default (`REPOWISE_DISABLE_EDITOR_SETUP=1` plus `--no-claude-md`) so indexing stays a repo-orientation operation instead of silently rewriting editor, MCP, or Claude Code config:
+For wrapper-managed `index`, `generate`, and `refresh`, the wrapper excludes generic transient paths and disables Repowise's editor setup layer by default (`REPOWISE_DISABLE_EDITOR_SETUP=1` plus `--no-claude-md`) so indexing stays a repo-orientation operation instead of silently rewriting editor, MCP, or Claude Code config:
 
 ```text
 .repowise/**

@@ -22,6 +22,7 @@
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
+    repowise-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -178,7 +179,7 @@
               test -f '${./packages/repowise-nix/patches/repowise-nix-language-support.patch}'
               grep -q -- 'inputs.repowise-nix.packages' '${./modules/packages.nix}'
               test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              find '${hostPkgs.repowise}/lib' -path '*/repowise/cli/editor_setup.py' -exec grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '{}' ';'
+              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${hostPkgs.repowise}/${hostPkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
               '${hostPkgs.repowise}/bin/repowise' --help >/dev/null
               mkdir repo
               REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nix}/bin/repowise-nix' --help >/dev/null

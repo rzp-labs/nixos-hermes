@@ -49,13 +49,14 @@
             test '${repowise.version}' = '0.10.0-repowise-nix'
             test -x '${repowise}/bin/repowise'
             test -x '${repowise-nix}/bin/repowise-nix'
-            find '${repowise}/lib' -path '*/repowise/cli/editor_setup.py' -exec grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '{}' ';'
+            grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${repowise}/${pkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
             '${repowise}/bin/repowise' --help >/dev/null
             mkdir repo
             REPOWISE_REPO="$PWD/repo" '${repowise-nix}/bin/repowise-nix' --help >/dev/null
             grep -q -- '.repowise/\*\*' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_EDITOR_SETUP' '${repowise-nix}/bin/repowise-nix'
+            grep -q -- '--no-claude-md' '${repowise-nix}/bin/repowise-nix'
             grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${repowise-nix}/bin/repowise-nix'
             touch $out
           '';

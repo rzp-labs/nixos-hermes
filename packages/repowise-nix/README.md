@@ -1,6 +1,6 @@
 # repowise-nix
 
-Standalone Nix/Linux packaging and workflow wrapper for [Repowise](https://github.com/repowise/repowise).
+Standalone Nix/Linux packaging and workflow wrapper for [Repowise](https://github.com/repowise-dev/repowise).
 
 This flake is intentionally separate from the `nixos-hermes` host modules. Package and wrapper changes can be built or run directly without rebuilding a NixOS host:
 
@@ -25,7 +25,7 @@ repowise-nix search "workspace task backend" --mode semantic --limit 5
 repowise-nix dead-code
 ```
 
-The wrapper passes through commands it does not special-case, so upstream commands such as `dead-code`, `health`, and `risk` stay available without reimplementing the CLI surface.
+The wrapper passes through commands it does not special-case, so upstream commands such as `dead-code`, `health`, and `risk` stay available without reimplementing the CLI surface. Excludes are applied only to wrapper-managed indexing/generation commands where upstream accepts `--exclude`.
 
 ## Configuration
 
@@ -58,6 +58,6 @@ REPOWISE_EDITOR_SETUP=1 repowise-nix generate --test-run
 By default `repowise-nix` disables Repowise editor setup:
 
 - exports `REPOWISE_DISABLE_EDITOR_SETUP=1`
-- passes `--no-claude-md` where applicable
+- passes `--no-claude-md` for wrapper-managed `index`, `generate`, and `refresh` commands
 
 That default keeps indexing/generation from silently creating `.mcp.json`, `.claude/CLAUDE.md`, or home-level Claude settings. Opt in explicitly with `REPOWISE_EDITOR_SETUP=1` when editor integration is the intended action.

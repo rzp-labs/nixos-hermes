@@ -30,6 +30,7 @@ writeShellApplication {
     )
 
     if [ -n "''${REPOWISE_EXTRA_EXCLUDES:-}" ]; then
+      set -f
       old_ifs="$IFS"
       IFS=':'
       for exclude in $REPOWISE_EXTRA_EXCLUDES; do
@@ -38,6 +39,7 @@ writeShellApplication {
         fi
       done
       IFS="$old_ifs"
+      set +f
     fi
 
     cd "$repo"
