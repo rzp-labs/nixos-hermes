@@ -19,7 +19,10 @@ py.buildPythonApplication {
     hash = "sha256-nq2ZYqJMihPc5maGx+c5WgzzLFiOzfQsku+fDqID8L8=";
   };
 
-  patches = [ ./patches/repowise-nix-language-support.patch ];
+  patches = [
+    ./patches/repowise-nix-language-support.patch
+    ./patches/repowise-status-stale-schema-warning.patch
+  ];
 
   pyproject = true;
   build-system = [ py.setuptools ];
