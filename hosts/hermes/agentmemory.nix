@@ -12,6 +12,7 @@ let
   dataDir = "${stateDir}/data";
   restPort = 3111;
   streamsPort = 3112;
+  normalizedLlmBaseUrl = lib.removeSuffix "/" cfg.llm.baseUrl;
   viewerPort = 3113;
   enginePort = 49134;
   yaml = pkgs.formats.yaml { };
@@ -192,7 +193,7 @@ in
           message = "services.agentmemory.llm.baseUrl must start with http:// or https://.";
         }
         {
-          assertion = !cfg.llm.enable || !(lib.hasSuffix "/v1" cfg.llm.baseUrl);
+          assertion = !cfg.llm.enable || !(lib.hasSuffix "/v1" normalizedLlmBaseUrl);
           message = "services.agentmemory.llm.baseUrl must be the proxy root; Agent Memory appends /v1/chat/completions itself.";
         }
       ];

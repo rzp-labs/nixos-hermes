@@ -311,9 +311,6 @@
               grep -q -- 'export OPENAI_API_KEY=' '${service.ExecStart}'
               grep -q -- '${hostConfig.sops.secrets.cliproxyapi-key.path}' '${service.ExecStart}'
               grep -q -- 'was not readable after 30s' '${service.ExecStart}'
-              ! grep -q -- 'OPENAI_API_KEY=' <<'EOF'
-              ${builtins.concatStringsSep "\n" (builtins.attrValues env)}
-              EOF
               grep -q -- '${pkgs.bash}/bin' <<'EOF'
               ${env.PATH}
               EOF

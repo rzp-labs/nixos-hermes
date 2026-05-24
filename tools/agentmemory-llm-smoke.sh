@@ -89,7 +89,7 @@ started_at = os.environ["AGENTMEMORY_SMOKE_STARTED_AT"]
 stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 marker = f"agentmemory-smoke-{stamp}"
 session_id = f"{marker}-session"
-file_path = f"/var/lib/hermes/workspace/nixos-hermes/hosts/hermes/agentmemory.nix"
+file_path = os.path.join(project, "hosts/hermes/agentmemory.nix")
 
 
 def request(method, path, payload=None, timeout_override=None):
@@ -117,8 +117,16 @@ def request(method, path, payload=None, timeout_override=None):
 
 
 def contains_disabled(obj):
-    text = json.dumps(obj, sort_keys=True).lower()
-    return "disabled" in text or "skipped" in text and "false" in text
+    if isinstance(obj, dict):
+        status = obj.get("status")
+        if isinstance(status, str) and status.lower() in {"disabled", "skipped"}:
+            return True
+        if obj.get("enabled") is False or obj.get("disabled") is True:
+            return True
+        return any(contains_disabled(value) for value in obj.values())
+    if isinstance(obj, list):
+        return any(contains_disabled(value) for value in obj)
+    return isinstance(obj, str) and obj.lower() in {"disabled", "skipped"}
 
 
 def wait_for_search():
@@ -255,8 +263,8 @@ finally:
     # runs do not inflate the live active-session inventory before Docker A/B work.
     try:
         session_end = request("POST", "/agentmemory/session/end", {"sessionId": session_id})
-    except SystemExit:
-        raise
+    except SystemExit as exc:
+        print(f"WARN: failed to close smoke session {session_id}: {exc}", file=sys.stderr)
     except Exception as exc:
         print(f"WARN: failed to close smoke session {session_id}: {exc}", file=sys.stderr)
 
