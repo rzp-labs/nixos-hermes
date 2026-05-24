@@ -40,6 +40,7 @@
     fh
     repowise
     repowise-nix
+    llm-agents.cli-proxy-api
     llm-agents.but
     uv # Python package manager — required for hindsight-embed setup
   ];

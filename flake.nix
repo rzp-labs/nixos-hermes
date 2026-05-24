@@ -15,10 +15,15 @@
     nixos-anywhere.url = "github:nix-community/nixos-anywhere";
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.inputs.disko.follows = "disko";
-    hermes-agent.url = "github:NousResearch/hermes-agent";
+    # Pin Hermes Agent to maintainer-cut releases instead of default-branch
+    # trunk. Upstream moves fast enough that unreleased commits deserve their
+    # own validation branch, not a routine package refresh.
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.16";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     llm-agents.url = "github:numtide/llm-agents.nix";
-    llm-agents.inputs.nixpkgs.follows = "nixpkgs";
+    # Keep GitButler on a separately validated llm-agents revision while allowing
+    # the main llm-agents input to advance OMP and other agent tools.
+    llm-agents-gitbutler.url = "github:numtide/llm-agents.nix/a7ad64dd500337232a35b5db16527475e8eec9a2";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
@@ -36,6 +41,7 @@
       nixos-anywhere,
       hermes-agent,
       llm-agents,
+      llm-agents-gitbutler,
       git-hooks,
       ...
     }@inputs:
@@ -52,7 +58,14 @@
     in
     {
       nixosConfigurations.nixos-hermes = nixpkgs.lib.nixosSystem {
-        specialArgs = { inherit inputs nixpkgs-llama llm-agents; };
+        specialArgs = {
+          inherit
+            inputs
+            nixpkgs-llama
+            llm-agents
+            llm-agents-gitbutler
+            ;
+        };
         modules = [
           determinate.nixosModules.default
           sops-nix.nixosModules.sops
@@ -175,6 +188,9 @@
               set -eu
               test '${hostPkgs.repowise.version}' = '0.10.0-repowise-nix'
               test -x '${hostPkgs.repowise}/bin/repowise'
+              test '${hostPkgs.llm-agents.cli-proxy-api.version}' = '7.1.20'
+              test -x '${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api'
+              ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.20'
               test -f '${./packages/repowise-nix/flake.nix}'
               test -f '${./packages/repowise-nix/patches/repowise-nix-language-support.patch}'
               grep -q -- 'inputs.repowise-nix.packages' '${./modules/packages.nix}'
@@ -208,6 +224,9 @@
               EOF
               grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
               ${hermesExtraPackages}
+              EOF
+              grep -q -- '${hostPkgs.llm-agents.cli-proxy-api}' <<'EOF'
+              ${systemPackages}
               EOF
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
               ${systemPackages}
@@ -315,7 +334,7 @@
             pkgs.runCommand "netdata-service-config" { } ''
               set -eu
               test '${if netdataCfg.enable then "true" else "false"}' = 'true'
-              test '${netdataCfg.package.version}' = '2.10.2'
+              test '${netdataCfg.package.version}' = '2.10.3'
               test '${if netdataCfg.enableAnalyticsReporting then "true" else "false"}' = 'false'
               test '${netdataCfg.config.web."bind to"}' = '127.0.0.1'
               test '${netdataCfg.config.plugins.freeipmi}' = 'no'

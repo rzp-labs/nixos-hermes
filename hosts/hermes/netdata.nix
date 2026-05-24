@@ -10,18 +10,18 @@
 let
   netdataPackageBase = nixpkgs-llama.legacyPackages.${pkgs.stdenv.hostPlatform.system}.netdata;
 
-  # Netdata Cloud currently requires 2.10.2 for security fixes, while both the
+  # Netdata Cloud currently requires 2.10.3 for security fixes, while both the
   # primary FlakeHub nixpkgs input and nixpkgs-llama still package older agents.
   # Keep this scoped to the Netdata package; do not move the host to NixOS stable.
   netdataPackage = netdataPackageBase.overrideAttrs (
     finalAttrs: previousAttrs: {
-      version = "2.10.2";
+      version = "2.10.3";
 
       src = pkgs.fetchFromGitHub {
         owner = "netdata";
         repo = "netdata";
         rev = "v${finalAttrs.version}";
-        hash = "sha256-TSjvQYBcLDMXYGa43g3RG43cM2aPBem/d/EJu9o97yQ=";
+        hash = "sha256-ryX+C3zuY7vONPeB4ocXDPttU5aSYbj1ThTosCSxmys=";
         fetchSubmodules = true;
       };
 
