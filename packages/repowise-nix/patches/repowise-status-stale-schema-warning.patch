@@ -1,0 +1,15 @@
+diff --git a/packages/cli/src/repowise/cli/commands/status_cmd.py b/packages/cli/src/repowise/cli/commands/status_cmd.py
+index 7d247ce..b0a8f11 100644
+--- a/packages/cli/src/repowise/cli/commands/status_cmd.py
++++ b/packages/cli/src/repowise/cli/commands/status_cmd.py
+@@ -417,1 +417,9 @@ def status_command(path: str | None, workspace: bool, no_workspace: bool) -> None:
+-    counts, total_db_tokens = run_async(_query_pages())
++    try:
++        counts, total_db_tokens = run_async(_query_pages())
++    except Exception as exc:
++        console.print(
++            "[yellow]Database schema is incomplete or incompatible; "
++            "refresh the local index with the sanctioned repowise-nix wrapper after reviewing local state.[/yellow]"
++        )
++        console.print(f"[dim]{type(exc).__name__}: {exc}[/dim]")
++        return
