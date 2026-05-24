@@ -51,6 +51,7 @@ but <mutation> ... --status-after
 - Equivalent branch subcommand syntax remains available: `but branch move <branch-name> <target-branch-name>` and `but branch move --unstack <branch-name>`
 - Push: `but push` or `but push <branch-id>`
 - Pull: `but pull --check` then `but pull --status-after`
+- Operation log / recovery: `but oplog` to inspect recent GitButler workspace operations before undo/recovery decisions.
 
 ## Task Recipes
 
@@ -85,6 +86,14 @@ Use GitButler as the commit-composition tool. Do **not** export a patch and appl
 7. Validate, then `but push <branch>`.
 
 If a clean replacement branch is still warranted, prefer GitButler-native reconstruction: create the branch with `but branch new`, then use file tools to edit the working tree and `but commit --changes ...`. Avoid `git apply`; patch replay hides whether you understood the GitButler object model.
+
+### Inspect GitButler operation history
+
+Use `but oplog` when you need to understand or recover recent workspace mutations — especially after move/rub/absorb/unapply/reapply operations, confusing hunk ownership, or before deciding whether `but undo` is safe. It is the GitButler-native operation history and is often more useful than guessing from `git log` alone.
+
+```bash
+but oplog
+```
 
 ### Reorder commits
 
