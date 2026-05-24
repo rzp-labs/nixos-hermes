@@ -52,9 +52,11 @@
                 test -x '${repowise}/bin/repowise'
                 test -x '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${repowise}/${pkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
+                grep -q -- 'unset PYTHONPATH' '${repowise}/bin/repowise'
                 '${repowise}/bin/repowise' --help >/dev/null
                 mkdir repo
                 REPOWISE_REPO="$PWD/repo" '${repowise-nix}/bin/repowise-nix' --help >/dev/null
+                grep -q -- 'unset PYTHONPATH' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- '.repowise/\*\*' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'REPOWISE_OPENAI_API_KEY' '${repowise-nix}/bin/repowise-nix'
