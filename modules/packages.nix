@@ -164,11 +164,18 @@ in
             outputHash = "sha256-UJ+sMdJFJ5GodKjuQVosKnIBXoMLWMmCg4RrbUCwW3Y=";
           };
         in
-        prev.stdenvNoCC.mkDerivation {
+        prev.stdenv.mkDerivation {
           pname = "agentmemory";
           inherit version src;
 
-          nativeBuildInputs = [ prev.makeWrapper ];
+          nativeBuildInputs = [
+            prev.makeWrapper
+            prev.nodejs
+            prev.pkg-config
+            prev.python3
+          ];
+
+          buildInputs = [ prev.vips ];
 
           dontConfigure = true;
           dontBuild = true;
@@ -177,7 +184,22 @@ in
             runHook preInstall
             mkdir -p $out/lib/node_modules/@agentmemory/agentmemory
             cp -R . $out/lib/node_modules/@agentmemory/agentmemory
-            ln -s ${nodeModules}/node_modules $out/lib/node_modules/@agentmemory/agentmemory/node_modules
+            cp -R ${nodeModules}/node_modules $out/lib/node_modules/@agentmemory/agentmemory/node_modules
+            chmod -R u+w $out/lib/node_modules/@agentmemory/agentmemory/node_modules
+
+            # @xenova/transformers is an optional dependency used by local
+            # embeddings. npm's --ignore-scripts keeps the optional dependency
+            # tree vendorable as a fixed-output dependency set, but leaves
+            # sharp without its native addon. Build sharp here, in the normal
+            # package derivation, where references to Nix-provided libvips are
+            # allowed.
+            export HOME="$TMPDIR/home"
+            export npm_config_cache="$TMPDIR/npm-cache"
+            export npm_config_build_from_source=true
+            export npm_config_sharp_libvips_global=true
+            export npm_config_nodedir=${prev.nodejs}
+            npm --prefix $out/lib/node_modules/@agentmemory/agentmemory rebuild sharp --build-from-source
+
             makeWrapper ${prev.nodejs}/bin/node $out/bin/agentmemory \
               --prefix PATH : ${prev.lib.makeBinPath [ final.iii-engine ]} \
               --add-flags $out/lib/node_modules/@agentmemory/agentmemory/dist/cli.mjs

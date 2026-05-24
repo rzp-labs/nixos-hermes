@@ -253,17 +253,31 @@
             pkgs.runCommand "agentmemory-service-config" { } ''
               set -eu
               test '${if hostConfig.services.agentmemory.enable then "true" else "false"}' = 'true'
+              test '${if hostConfig.services.agentmemory.llm.enable then "true" else "false"}' = 'true'
+              test '${hostConfig.services.agentmemory.llm.baseUrl}' = 'http://10.0.0.102:8317'
+              test '${hostConfig.services.agentmemory.llm.model}' = 'gpt-5.4-mini'
+              test '${toString hostConfig.services.agentmemory.llm.timeoutMs}' = '120000'
+              test '${hostConfig.services.agentmemory.llm.embeddingProvider}' = 'local'
               test '${hostConfig.services.agentmemory.package.version}' = '0.9.21'
+              test -d '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory/node_modules/@xenova/transformers'
+              test -f '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory/node_modules/sharp/build/Release/sharp-linux-x64.node'
+              (cd '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory' && ${pkgs.nodejs}/bin/node --input-type=module -e 'import("@xenova/transformers").then((m) => { if (typeof m.pipeline !== "function") process.exit(1); }).catch((err) => { console.error(err); process.exit(1); })')
               test '${hostConfig.services.agentmemory.package.passthru.iii-engine.version}' = '0.11.2'
               test '${env.HOME}' = '/var/lib/agentmemory'
               test '${env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
               test '${env.AGENTMEMORY_VIEWER_URL}' = 'http://127.0.0.1:3113'
               test '${env.AGENTMEMORY_ALLOW_AGENT_SDK}' = 'false'
-              test '${env.AGENTMEMORY_AUTO_COMPRESS}' = 'false'
-              test '${env.GRAPH_EXTRACTION_ENABLED}' = 'false'
-              test '${env.CONSOLIDATION_ENABLED}' = 'false'
-              test '${env.AGENTMEMORY_INJECT_CONTEXT}' = 'false'
+              test '${env.AGENTMEMORY_AUTO_COMPRESS}' = 'true'
+              test '${env.GRAPH_EXTRACTION_ENABLED}' = 'true'
+              test '${env.CONSOLIDATION_ENABLED}' = 'true'
+              test '${env.AGENTMEMORY_INJECT_CONTEXT}' = 'true'
               test '${env.AGENTMEMORY_TOOLS}' = 'core'
+              test '${env.OPENAI_BASE_URL}' = 'http://10.0.0.102:8317'
+              test '${env.OPENAI_MODEL}' = 'gpt-5.4-mini'
+              test '${env.AGENTMEMORY_LLM_TIMEOUT_MS}' = '120000'
+              test '${env.OPENAI_TIMEOUT_MS}' = '120000'
+              test '${env.EMBEDDING_PROVIDER}' = 'local'
+              test '${if builtins.hasAttr "OPENAI_API_KEY" env then "true" else "false"}' = 'false'
               test '${env.III_REST_PORT}' = '3111'
               test '${env.III_STREAMS_PORT}' = '3112'
               test '${env.III_STREAM_PORT}' = '3112'
@@ -271,6 +285,9 @@
               test '${env.III_ENGINE_URL}' = 'ws://127.0.0.1:49134'
               test '${service.User}' = 'agentmemory'
               test '${service.Group}' = 'agentmemory'
+              test '${hostConfig.sops.secrets.cliproxyapi-key.owner}' = 'agentmemory'
+              test '${hostConfig.sops.secrets.cliproxyapi-key.group}' = 'agentmemory'
+              test '${hostConfig.sops.secrets.cliproxyapi-key.mode}' = '0400'
               test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
               test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
               test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
@@ -290,9 +307,10 @@
               test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'nix-managed-agentmemory-hermes-plugin'
               test '${service.ProtectSystem}' = 'strict'
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
-              grep -q -- '/bin/iii --config ' <<'EOF'
-              ${service.ExecStart}
-              EOF
+              grep -q -- '/bin/iii --config ' '${service.ExecStart}'
+              grep -q -- 'export OPENAI_API_KEY=' '${service.ExecStart}'
+              grep -q -- '${hostConfig.sops.secrets.cliproxyapi-key.path}' '${service.ExecStart}'
+              grep -q -- 'was not readable after 30s' '${service.ExecStart}'
               grep -q -- '${pkgs.bash}/bin' <<'EOF'
               ${env.PATH}
               EOF
@@ -300,7 +318,7 @@
               ${env.PATH}
               EOF
               grep -q -- 'agentmemory-iii-config.yaml' <<'EOF'
-              ${service.ExecStart}
+              ${builtins.readFile service.ExecStart}
               EOF
               grep -q -- 'agentmemory-ready-check' <<'EOF'
               ${toString service.ExecStartPost}

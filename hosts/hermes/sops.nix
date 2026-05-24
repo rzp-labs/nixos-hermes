@@ -28,13 +28,14 @@
       mode = "0400";
     };
 
-    # API key for the LAN CLIProxyAPI endpoint used by Hindsight's external
-    # OpenAI-compatible LLM provider. The key is passed as a systemd credential
-    # to hindsight-embed, not written into the Nix store.
+    # API key for the LAN CLIProxyAPI endpoint used by local OpenAI-compatible
+    # LLM providers. The key is consumed at runtime by managed services, not
+    # written into the Nix store.
     cliproxyapi-key = {
       sopsFile = ./secrets/cliproxyapi-key.enc;
       format = "binary";
-      owner = "hermes";
+      owner = "agentmemory";
+      group = "agentmemory";
       mode = "0400";
     };
 
