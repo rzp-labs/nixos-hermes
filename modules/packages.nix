@@ -129,6 +129,7 @@ in
 
       repowise = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise;
       repowise-nix = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise-nix;
+      vite-plus = prev.callPackage ../packages/vite-plus { };
 
       agentmemory =
         let

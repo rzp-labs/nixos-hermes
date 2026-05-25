@@ -183,11 +183,31 @@
               systemPackages = builtins.concatStringsSep "\n" (
                 map toString hostConfig.environment.systemPackages
               );
+              loginShellInit = hostConfig.environment.loginShellInit;
+              interactiveShellInit = hostConfig.environment.interactiveShellInit;
             in
             pkgs.runCommand "repowise-nix-tooling" { } ''
               set -eu
               test '${hostPkgs.repowise.version}' = '0.10.0-repowise-nix'
               test -x '${hostPkgs.repowise}/bin/repowise'
+              test '${hostPkgs.vite-plus.version}' = '0.1.22'
+              test -x '${hostPkgs.vite-plus}/bin/vp'
+              test -x '${hostPkgs.vite-plus}/bin/vpx'
+              test -x '${hostPkgs.vite-plus}/bin/vpr'
+              '${hostPkgs.vite-plus}/bin/vp' --help >/dev/null
+              '${hostPkgs.vite-plus}/bin/vpx' --help >/dev/null
+              '${hostPkgs.vite-plus}/bin/vpr' --help >/dev/null
+              '${hostPkgs.vite-plus}/bin/vp' env --help >/dev/null
+              vp_home="$PWD/vp-home"
+              mkdir -p "$vp_home/.vite-plus/bin"
+              for tool in vp node npm npx vpx vpr; do
+                ln -s ../current/bin/vp "$vp_home/.vite-plus/bin/$tool"
+              done
+              setup_output=$(HOME="$vp_home" PATH="${hostPkgs.vite-plus}/bin:${hostPkgs.nodejs}/bin:$PATH" '${hostPkgs.vite-plus}/bin/vp' env setup --refresh 2>&1)
+              printf '%s\n' "$setup_output" | grep -vq 'File exists (os error 17)'
+              for tool in vp node npm npx vpx vpr; do
+                test "$(readlink "$vp_home/.vite-plus/bin/$tool")" = '${hostPkgs.vite-plus}/bin/vp'
+              done
               test '${hostPkgs.llm-agents.cli-proxy-api.version}' = '7.1.20'
               test -x '${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api'
               ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.20'
@@ -229,6 +249,15 @@
               EOF
               grep -q -- '${hostPkgs.llm-agents.cli-proxy-api}' <<'EOF'
               ${systemPackages}
+              EOF
+              grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
+              ${systemPackages}
+              EOF
+              grep -q -- '.vite-plus/env' <<'EOF'
+              ${loginShellInit}
+              EOF
+              grep -q -- '.vite-plus/env' <<'EOF'
+              ${interactiveShellInit}
               EOF
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
               ${systemPackages}
