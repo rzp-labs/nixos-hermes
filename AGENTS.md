@@ -32,6 +32,7 @@ nixos-hermes/
 │       └── secrets/                     # committed SOPS-encrypted files
 ├── modules/
 │   ├── system.nix                       # locale, tz, networking, packages, sudo
+│   ├── home-manager.nix                 # Home Manager wiring for admin/operator user environment
 │   ├── hermes-agent.nix                 # hermes service declaration
 │   ├── hermes-plugins.nix               # declarative Hermes plugin packages/enables
 │   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds, Repowise)
@@ -132,6 +133,8 @@ Right tool, right job. Pick the lightest tool that covers the change.
 | systemd unit change | `nixos-rebuild dry-activate` | Yes |
 | Activation script change | `nix build .#checks.x86_64-linux.<test>` (VM) | No |
 | Real secrets / hardware / network | `nixos-rebuild test` | Yes |
+
+For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home/admin/workspace/nixos-hermes` with all unrelated GitButler branches unapplied and only the target branch under test applied. This proves the local flake without contamination from the agent workspace's other applied stacks. Live `nixos-rebuild switch` remains FlakeHub-based, not local-workspace based, unless explicitly authorized otherwise.
 
 The VM tests live under `tests/` and run via QEMU — no root needed.
 `checks.x86_64-linux.vm-switch-smoke` is the heaviest repo-owned smoke:
@@ -276,6 +279,14 @@ After first install:
 
 - Includes: locale, timezone, networking, openssh, sudo, packages, and session variables.
 - No host-specific values.
+
+### `modules/home-manager.nix`
+
+*User-scoped interactive/operator environment.*
+
+- Owns Home Manager module configuration for user environments managed on this host.
+- Keep human/operator shell UX and per-user toolchains here rather than in host-wide shell init.
+- `admin` is the first managed home. Add other users deliberately; service accounts such as `hermes` need runtime-boundary review before Home Manager owns their home state.
 
 ### `modules/hermes-agent.nix`
 
