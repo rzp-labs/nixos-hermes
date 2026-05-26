@@ -449,7 +449,7 @@
             pkgs.runCommand "hindsight-service-config" { } ''
               set -eu
               test '${if hostConfig.services.hindsightMemory.enable then "true" else "false"}' = 'false'
-              test '${hermesMemory.provider}' = 'agentmemory'
+              test '${hermesMemory.provider}' = 'nix-managed-agentmemory-hermes-plugin'
               test '${if builtins.elem "hindsight-embed" serviceNames then "true" else "false"}' = 'false'
               test '${if builtins.elem "hindsight-postgres-init" serviceNames then "true" else "false"}' = 'false'
               test '${if builtins.elem "llama-server" serviceNames then "true" else "false"}' = 'false'

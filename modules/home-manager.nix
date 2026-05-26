@@ -23,6 +23,8 @@ in
   home-manager.useUserPackages = true;
 
   home-manager.users.admin = {
+    manual.manpages.enable = false;
+
     home = vitePlusHome // {
       stateVersion = "25.05";
       packages =
@@ -39,6 +41,8 @@ in
   };
 
   home-manager.users.hermes = {
+    manual.manpages.enable = false;
+
     home = vitePlusHome // {
       stateVersion = "25.05";
       packages = vitePlusToolchain;
