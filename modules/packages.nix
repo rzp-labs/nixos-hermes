@@ -106,35 +106,27 @@ in
               text = lock.read_text()
               blocks = text.split("[[package]]\n")
               registry_sources = {}
-              package_sources = []
+              package_data = []
               for block in blocks[1:]:
                   fields = {}
                   for line in block.splitlines():
                       if line.startswith(('name = ', 'version = ', 'source = ')):
                           key, value = line.split(' = ', 1)
                           fields[key] = value.strip('"')
-                  name = fields.get('name')
-                  version = fields.get('version')
-                  source = fields.get('source')
-                  if name and version and source:
-                      package_sources.append((name, version, source, block))
-                      if source.startswith('registry+'):
-                          registry_sources[(name, version)] = source
+                  name, version, source = fields.get('name'), fields.get('version'), fields.get('source')
+                  identity = (name, version, source)
+                  package_data.append((identity, block))
+                  if name and version and source and source.startswith('registry+'):
+                      registry_sources[(name, version)] = source
 
               git_sources_to_normalize = {
-                  (name, version, source): registry_sources[(name, version)]
-                  for name, version, source, _block in package_sources
-                  if source.startswith('git+') and (name, version) in registry_sources
+                  (name, version, source)
+                  for (name, version, source), _block in package_data
+                  if source and source.startswith('git+') and (name, version) in registry_sources
               }
 
               kept = [blocks[0]]
-              for block in blocks[1:]:
-                  fields = {}
-                  for line in block.splitlines():
-                      if line.startswith(('name = ', 'version = ', 'source = ')):
-                          key, value = line.split(' = ', 1)
-                          fields[key] = value.strip('"')
-                  identity = (fields.get('name'), fields.get('version'), fields.get('source'))
+              for identity, block in package_data:
                   if identity in git_sources_to_normalize:
                       continue
                   kept.append('[[package]]\n' + block)
