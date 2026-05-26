@@ -12,6 +12,8 @@
     sops-nix.url = "https://flakehub.com/f/Mic92/sops-nix/0.1.1200";
     disko.url = "https://flakehub.com/f/nix-community/disko/*";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0.2511.*";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.url = "github:nix-community/nixos-anywhere";
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.inputs.disko.follows = "disko";
@@ -38,6 +40,7 @@
       determinate,
       sops-nix,
       disko,
+      home-manager,
       nixos-anywhere,
       hermes-agent,
       llm-agents,
@@ -70,6 +73,7 @@
           determinate.nixosModules.default
           sops-nix.nixosModules.sops
           disko.nixosModules.default
+          home-manager.nixosModules.home-manager
           hermes-agent.nixosModules.default
           ./hosts/hermes
         ];
@@ -183,8 +187,10 @@
               systemPackages = builtins.concatStringsSep "\n" (
                 map toString hostConfig.environment.systemPackages
               );
-              loginShellInit = hostConfig.environment.loginShellInit;
-              interactiveShellInit = hostConfig.environment.interactiveShellInit;
+              adminHome = hostConfig.home-manager.users.admin;
+              adminHomePackages = builtins.concatStringsSep "\n" (map toString adminHome.home.packages);
+              adminHomeSessionPath = builtins.concatStringsSep "\n" adminHome.home.sessionPath;
+              adminBashInit = adminHome.programs.bash.initExtra;
             in
             pkgs.runCommand "repowise-nix-tooling" { } ''
               set -eu
@@ -251,13 +257,25 @@
               ${systemPackages}
               EOF
               grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
+              ${adminHomePackages}
+              EOF
+              grep -q -- '${hostPkgs.nodejs}' <<'EOF'
+              ${adminHomePackages}
+              EOF
+              grep -q -- '${hostPkgs.llm-agents.omp}' <<'EOF'
+              ${adminHomePackages}
+              EOF
+              grep -q -- '.vite-plus/bin' <<'EOF'
+              ${adminHomeSessionPath}
+              EOF
+              grep -q -- '.vite-plus/env' <<'EOF'
+              ${adminBashInit}
+              EOF
+              ! grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
               ${systemPackages}
               EOF
-              grep -q -- '.vite-plus/env' <<'EOF'
-              ${loginShellInit}
-              EOF
-              grep -q -- '.vite-plus/env' <<'EOF'
-              ${interactiveShellInit}
+              ! grep -q -- '${hostPkgs.nodejs}' <<'EOF'
+              ${systemPackages}
               EOF
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
               ${systemPackages}
