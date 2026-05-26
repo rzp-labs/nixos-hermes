@@ -286,7 +286,8 @@ After first install:
 
 - Owns Home Manager module configuration for user environments managed on this host.
 - Keep human/operator shell UX and per-user toolchains here rather than in host-wide shell init.
-- `admin` is the first managed home. Add other users deliberately; service accounts such as `hermes` need runtime-boundary review before Home Manager owns their home state.
+- Shared user-facing toolchains used by both the operator and the Hermes service persona belong here for each intended home, not in `environment.systemPackages` by accident.
+- Add other service accounts deliberately; review their runtime state boundary before Home Manager owns additional home files.
 
 ### `modules/hermes-agent.nix`
 
