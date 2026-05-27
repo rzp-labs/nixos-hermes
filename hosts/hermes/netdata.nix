@@ -196,7 +196,7 @@ let
         charts                       List available charts
         allmetrics                   Dump all metrics as JSON
         data <chart> [seconds]       Fetch chart data, default window: 300s
-        api <path-or-url>            Call an arbitrary Netdata API path
+        api <path>                   Call an arbitrary Netdata API path
         logs [unit] [journal args]   Show systemd logs, default unit: netdata.service
 
       Examples:
@@ -209,11 +209,11 @@ let
       get() {
         local target="$1"
         if [[ "$target" == http://* || "$target" == https://* ]]; then
-          curl --fail --silent --show-error "$target" | jq .
-        else
-          [[ "$target" == /* ]] || target="/$target"
-          curl --fail --silent --show-error "$base_url$target" | jq .
+          echo "Error: Absolute URLs are not permitted. Only paths are allowed." >&2
+          exit 1
         fi
+        [[ "$target" == /* ]] || target="/$target"
+        curl --fail --silent --show-error "$base_url$target" | jq .
       }
 
       command="''${1:-}"
@@ -250,7 +250,7 @@ let
         api)
           target="''${1:-}"
           if [[ -z "$target" ]]; then
-            echo "API path or URL is required" >&2
+            echo "API path is required" >&2
             usage >&2
             exit 2
           fi
