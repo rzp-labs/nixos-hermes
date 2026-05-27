@@ -145,7 +145,7 @@ Preferred recovery:
 2. Unapply the suspect branch/stack from the workspace:
 
    ```bash
-   but unapply <branch-or-stack> --status-after
+   but unapply <branch-name> --status-after
    ```
 
 3. If unapply leaves tiny unassigned residue caused by your attempted repair, inspect it with `but diff`; discard only residue that is clearly from the failed repair:
