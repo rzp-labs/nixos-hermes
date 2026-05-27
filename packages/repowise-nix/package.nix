@@ -2,6 +2,7 @@
   lib,
   python313Packages,
   fetchFromGitHub,
+  makeWrapper,
 }:
 
 let
@@ -27,7 +28,10 @@ py.buildPythonApplication {
   pyproject = true;
   build-system = [ py.setuptools ];
 
-  nativeBuildInputs = [ py.pythonRelaxDepsHook ];
+  nativeBuildInputs = [
+    py.pythonRelaxDepsHook
+    makeWrapper
+  ];
   pythonRelaxDeps = [
     "tree-sitter-kotlin"
     "tree-sitter-luau"
@@ -96,6 +100,10 @@ py.buildPythonApplication {
     "repowise.cli.main"
     "repowise.server.app"
   ];
+
+  postFixup = ''
+    wrapProgram $out/bin/repowise --unset PYTHONPATH
+  '';
 
   meta = {
     description = "Codebase intelligence and wiki generator with local Nix support";

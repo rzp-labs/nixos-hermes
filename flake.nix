@@ -196,9 +196,11 @@
               grep -q -- 'inputs.repowise-nix.packages' '${./modules/packages.nix}'
               test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${hostPkgs.repowise}/${hostPkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
+              grep -q -- 'unset PYTHONPATH' '${hostPkgs.repowise}/bin/repowise'
               '${hostPkgs.repowise}/bin/repowise' --help >/dev/null
               mkdir repo
               REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nix}/bin/repowise-nix' --help >/dev/null
+              grep -q -- 'unset PYTHONPATH' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${hostPkgs.repowise-nix}/bin/repowise-nix'
               grep -q -- 'REPOWISE_OPENAI_API_KEY' '${hostPkgs.repowise-nix}/bin/repowise-nix'

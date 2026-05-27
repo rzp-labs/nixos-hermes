@@ -10,6 +10,11 @@ writeShellApplication {
   text = ''
     set -euo pipefail
 
+    # Repowise is packaged with its own Python closure. Hermes terminal sessions
+    # often carry a PYTHONPATH for the Hermes sealed venv, and mixing Python
+    # minor versions makes provider imports fail in misleading ways.
+    unset PYTHONPATH
+
     repo="''${REPOWISE_REPO:-$PWD}"
     command="''${1:-status}"
     shift || true
