@@ -35,10 +35,10 @@ stdenv.mkDerivation rec {
 
       for tool in vp node npm npx vpx vpr; do
         shim="\$vp_home/bin/\$tool"
-        if [ -L "\$shim" ] && [ "\$(${coreutils}/bin/readlink "\$shim")" = "../current/bin/vp" ]; then
-          ${coreutils}/bin/ln -sfn "$out/bin/vp" "\$shim"
-        fi
-      done
+        case "\$(${coreutils}/bin/readlink "\$shim")" in
+          ../current/bin/vp|/nix/store/*-vite-plus-*/bin/vp)
+            ${coreutils}/bin/ln -sfn "$out/bin/vp" "\$shim" ;;
+        esac
     }
 
     if [ "\''${1-}" = "env" ] && [ "\''${2-}" = "setup" ]; then
