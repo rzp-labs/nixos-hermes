@@ -12,6 +12,8 @@
     sops-nix.url = "https://flakehub.com/f/Mic92/sops-nix/0.1.1200";
     disko.url = "https://flakehub.com/f/nix-community/disko/*";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0.2511.*";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.url = "github:nix-community/nixos-anywhere";
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.inputs.disko.follows = "disko";
@@ -38,6 +40,7 @@
       determinate,
       sops-nix,
       disko,
+      home-manager,
       nixos-anywhere,
       hermes-agent,
       llm-agents,
@@ -70,6 +73,7 @@
           determinate.nixosModules.default
           sops-nix.nixosModules.sops
           disko.nixosModules.default
+          home-manager.nixosModules.home-manager
           hermes-agent.nixosModules.default
           ./hosts/hermes
         ];
@@ -183,11 +187,33 @@
               systemPackages = builtins.concatStringsSep "\n" (
                 map toString hostConfig.environment.systemPackages
               );
+              adminHome = hostConfig.home-manager.users.admin;
+              adminHomePackages = builtins.concatStringsSep "\n" (map toString adminHome.home.packages);
+              adminHomeSessionPath = builtins.concatStringsSep "\n" adminHome.home.sessionPath;
+              adminBashInit = adminHome.programs.bash.initExtra;
             in
             pkgs.runCommand "repowise-nix-tooling" { } ''
               set -eu
               test '${hostPkgs.repowise.version}' = '0.10.0-repowise-nix'
               test -x '${hostPkgs.repowise}/bin/repowise'
+              test '${hostPkgs.vite-plus.version}' = '0.1.22'
+              test -x '${hostPkgs.vite-plus}/bin/vp'
+              test -x '${hostPkgs.vite-plus}/bin/vpx'
+              test -x '${hostPkgs.vite-plus}/bin/vpr'
+              '${hostPkgs.vite-plus}/bin/vp' --help >/dev/null
+              '${hostPkgs.vite-plus}/bin/vpx' --help >/dev/null
+              '${hostPkgs.vite-plus}/bin/vpr' --help >/dev/null
+              '${hostPkgs.vite-plus}/bin/vp' env --help >/dev/null
+              vp_home="$PWD/vp-home"
+              mkdir -p "$vp_home/.vite-plus/bin"
+              for tool in vp node npm npx vpx vpr; do
+                ln -s ../current/bin/vp "$vp_home/.vite-plus/bin/$tool"
+              done
+              setup_output=$(HOME="$vp_home" PATH="${hostPkgs.vite-plus}/bin:${hostPkgs.nodejs}/bin:$PATH" '${hostPkgs.vite-plus}/bin/vp' env setup --refresh 2>&1)
+              ! printf '%s\n' "$setup_output" | grep -q 'File exists (os error 17)'
+              for tool in vp node npm npx vpx vpr; do
+                test "$(readlink "$vp_home/.vite-plus/bin/$tool")" = '${hostPkgs.vite-plus}/bin/vp'
+              done
               test '${hostPkgs.llm-agents.cli-proxy-api.version}' = '7.1.20'
               test -x '${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api'
               ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.20'
@@ -228,6 +254,27 @@
               ${hermesExtraPackages}
               EOF
               grep -q -- '${hostPkgs.llm-agents.cli-proxy-api}' <<'EOF'
+              ${systemPackages}
+              EOF
+              grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
+              ${adminHomePackages}
+              EOF
+              grep -q -- '${hostPkgs.nodejs}' <<'EOF'
+              ${adminHomePackages}
+              EOF
+              grep -q -- '${hostPkgs.llm-agents.omp}' <<'EOF'
+              ${adminHomePackages}
+              EOF
+              grep -q -- '.vite-plus/bin' <<'EOF'
+              ${adminHomeSessionPath}
+              EOF
+              grep -q -- '.vite-plus/env' <<'EOF'
+              ${adminBashInit}
+              EOF
+              ! grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
+              ${systemPackages}
+              EOF
+              ! grep -q -- '${hostPkgs.nodejs}' <<'EOF'
               ${systemPackages}
               EOF
               grep -q -- '${hostPkgs.repowise}' <<'EOF'
@@ -402,7 +449,7 @@
             pkgs.runCommand "hindsight-service-config" { } ''
               set -eu
               test '${if hostConfig.services.hindsightMemory.enable then "true" else "false"}' = 'false'
-              test '${hermesMemory.provider}' = 'agentmemory'
+              test '${hermesMemory.provider}' = 'nix-managed-agentmemory-hermes-plugin'
               test '${if builtins.elem "hindsight-embed" serviceNames then "true" else "false"}' = 'false'
               test '${if builtins.elem "hindsight-postgres-init" serviceNames then "true" else "false"}' = 'false'
               test '${if builtins.elem "llama-server" serviceNames then "true" else "false"}' = 'false'

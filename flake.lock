@@ -424,6 +424,25 @@
         "type": "github"
       }
     },
+    "home-manager": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779506708,
+        "narHash": "sha256-QOD/CNm196nCJRheux/URi4/HE66fthdOMqCJoPP1Y0=",
+        "rev": "3ee51fbdac8c8bdfe1e7e1fcaba6520a563f394f",
+        "revCount": 5888,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/nix-community/home-manager/0.2511.5888%2Brev-3ee51fbdac8c8bdfe1e7e1fcaba6520a563f394f/019e52ed-8705-7453-a462-61d129074f8b/source.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/nix-community/home-manager/0.2511.%2A"
+      }
+    },
     "llm-agents": {
       "inputs": {
         "blueprint": "blueprint",
@@ -852,6 +871,7 @@
         "disko": "disko",
         "git-hooks": "git-hooks",
         "hermes-agent": "hermes-agent",
+        "home-manager": "home-manager",
         "llm-agents": "llm-agents",
         "llm-agents-gitbutler": "llm-agents-gitbutler",
         "nixos-anywhere": "nixos-anywhere",
