@@ -35,6 +35,12 @@ in
           llm-agents.omp # terminal-based multi-model coding agent
         ])
         ++ vitePlusToolchain;
+      sessionVariables = {
+        XDG_DATA_HOME   = "$HOME/.local/share";
+        XDG_STATE_HOME  = "$HOME/.local/state";
+        XDG_CACHE_HOME  = "$HOME/.cache";
+        XDG_CONFIG_HOME = "$HOME/.config";
+      };
     };
 
     programs.bash.enable = true;
