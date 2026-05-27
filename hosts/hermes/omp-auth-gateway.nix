@@ -1,19 +1,31 @@
 # Host-local OMP auth broker/gateway for Hermes inference.
-{ lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   brokerPort = 9000;
   gatewayPort = 4000;
   bindHost = "127.0.0.1";
   adminHome = "/home/admin";
+  tokenFile = "${adminHome}/.omp/auth-broker.token";
   omp = lib.getExe pkgs.llm-agents.omp;
 
   brokerUrl = "http://${bindHost}:${toString brokerPort}";
   gatewayBaseUrl = "http://${bindHost}:${toString gatewayPort}/v1";
 
+  installBrokerToken = pkgs.writeShellScript "omp-auth-broker-install-token" ''
+    set -eu
+    install -d -m 0700 -o admin -g users ${adminHome}/.omp
+    install -m 0600 -o admin -g users ${config.sops.secrets.omp-auth-broker-token.path} ${tokenFile}
+  '';
+
   brokerReadyCheck = pkgs.writeShellScript "omp-auth-broker-ready" ''
     set -eu
-    token_file=${adminHome}/.omp/auth-broker.token
+    token_file=${tokenFile}
     for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
       if [ -r "$token_file" ]; then
         token="$(${pkgs.coreutils}/bin/cat "$token_file")"
@@ -83,12 +95,14 @@ in
       restartTriggers = [
         pkgs.llm-agents.omp
         brokerReadyCheck
+        installBrokerToken
       ];
 
       serviceConfig = {
         Type = "simple";
         User = "admin";
         WorkingDirectory = adminHome;
+        ExecStartPre = "+${installBrokerToken}";
         ExecStart = "${omp} auth-broker serve --bind=${bindHost}:${toString brokerPort}";
         ExecStartPost = brokerReadyCheck;
         Restart = "on-failure";
@@ -126,12 +140,14 @@ in
       restartTriggers = [
         pkgs.llm-agents.omp
         gatewayReadyCheck
+        installBrokerToken
       ];
 
       serviceConfig = {
         Type = "simple";
         User = "admin";
         WorkingDirectory = adminHome;
+        ExecStartPre = "+${installBrokerToken}";
         ExecStart = "${omp} auth-gateway serve --bind=${bindHost}:${toString gatewayPort} --no-auth";
         ExecStartPost = gatewayReadyCheck;
         Restart = "on-failure";
