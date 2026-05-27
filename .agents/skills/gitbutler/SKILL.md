@@ -45,7 +45,7 @@ but <mutation> ... --status-after
 - Commit + create branch: `but commit <branch> -c -m "<msg>" --changes <id> --status-after`
 - Amend: `but amend <file-id> <commit-id> --status-after`
 - Reorder commits: `but move <source-commit-id> <target-commit-id> --status-after` (**commit IDs**, not branch names)
-- Move a commit to another branch: `but move <source-commit-id> <target-branch-name-or-id> --status-after`. The target branch must be applied/visible in `but status -fv`; if it is currently listed under unapplied branches, run `but apply <target-branch> --status-after` first, then move the commit.
+- Move a commit to another branch: `but move <source-commit-id> <target-branch-name> --status-after` or `but move <source-commit-id> <target-branch-id> --status-after`. The target branch must be applied/visible in `but status -fv`; if it is currently listed under unapplied branches, run `but apply <target-branch-name> --status-after` first, then move the commit.
 - Stack branches: `but move <branch-name-or-id> <target-branch-name-or-id> --status-after` (**branch names or branch CLI IDs**)
 - Tear off a branch: `but move <branch-name-or-id> zz --status-after` (`zz` = unassigned; branch name or branch CLI ID)
 - Equivalent branch subcommand syntax remains available: `but branch move <branch-name> <target-branch-name>` and `but branch move --unstack <branch-name>`
