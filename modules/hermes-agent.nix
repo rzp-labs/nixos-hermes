@@ -1,5 +1,6 @@
 {
   config,
+  lib,
   pkgs,
   ...
 }:
@@ -65,18 +66,18 @@
     settings = {
       model = {
         # OpenAI Codex provider uses the Responses API endpoint.
-        base_url = "https://api.openai.com/v1/responses";
-        default = "gpt-5.5";
-        provider = "openai-codex";
+        base_url = lib.mkDefault "https://api.openai.com/v1/responses";
+        default = lib.mkDefault "gpt-5.5";
+        provider = lib.mkDefault "openai-codex";
       };
 
       # Automatic provider failover on rate limits, overload, or connection
       # failures. OpenRouter uses an API key (not OAuth) so it survives
       # Nous inference token expiry or refresh failures.
       fallback_model = {
-        provider = "openrouter";
-        base_url = "https://openrouter.ai/api/v1";
-        model = "openai/gpt-5.5";
+        provider = lib.mkDefault "openrouter";
+        base_url = lib.mkDefault "https://openrouter.ai/api/v1";
+        model = lib.mkDefault "openai/gpt-5.5";
       };
 
       # Replaces the deprecated MESSAGING_CWD environment variable.

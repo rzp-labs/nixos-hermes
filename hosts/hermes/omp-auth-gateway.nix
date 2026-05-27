@@ -19,8 +19,8 @@ let
 
   installBrokerToken = pkgs.writeShellScript "omp-auth-broker-install-token" ''
     set -eu
-    install -d -m 0700 -o admin -g users ${adminHome}/.omp
-    install -m 0600 -o admin -g users ${config.sops.secrets.omp-auth-broker-token.path} ${tokenFile}
+    ${pkgs.coreutils}/bin/install -d -m 0700 -o admin -g users ${adminHome}/.omp
+    ${pkgs.coreutils}/bin/install -m 0600 -o admin -g users ${config.sops.secrets.omp-auth-broker-token.path} ${tokenFile}
   '';
 
   brokerReadyCheck = pkgs.writeShellScript "omp-auth-broker-ready" ''
@@ -35,7 +35,7 @@ let
           exit 0
         fi
       fi
-      sleep 1
+      ${pkgs.coreutils}/bin/sleep 1
     done
     echo "OMP auth broker did not become ready" >&2
     exit 1
@@ -47,7 +47,7 @@ let
       if ${pkgs.curl}/bin/curl -fsS --max-time 2 ${gatewayBaseUrl}/models >/dev/null; then
         exit 0
       fi
-      sleep 1
+      ${pkgs.coreutils}/bin/sleep 1
     done
     echo "OMP auth gateway did not expose a model catalog" >&2
     exit 1
@@ -79,8 +79,14 @@ in
   systemd.services = {
     omp-auth-broker = {
       description = "OMP OAuth auth broker";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
+      after = [
+        "network-online.target"
+        "sops-nix.service"
+      ];
+      wants = [
+        "network-online.target"
+        "sops-nix.service"
+      ];
       wantedBy = [ "multi-user.target" ];
 
       environment = {
@@ -140,14 +146,12 @@ in
       restartTriggers = [
         pkgs.llm-agents.omp
         gatewayReadyCheck
-        installBrokerToken
       ];
 
       serviceConfig = {
         Type = "simple";
         User = "admin";
         WorkingDirectory = adminHome;
-        ExecStartPre = "+${installBrokerToken}";
         ExecStart = "${omp} auth-gateway serve --bind=${bindHost}:${toString gatewayPort} --no-auth";
         ExecStartPost = gatewayReadyCheck;
         Restart = "on-failure";

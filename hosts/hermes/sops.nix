@@ -36,6 +36,7 @@
       owner = "admin";
       mode = "0400";
     };
+
     # API key for the LAN CLIProxyAPI endpoint used by local OpenAI-compatible
     # LLM providers. The key is consumed at runtime by managed services, not
     # written into the Nix store.
