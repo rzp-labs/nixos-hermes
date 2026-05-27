@@ -42,8 +42,62 @@
           pkgs = nixpkgs.legacyPackages.${system};
           repowise = self.packages.${system}.repowise;
           repowise-nix = self.packages.${system}.repowise-nix;
+
+          mockRepowise = pkgs.writeShellScriptBin "repowise" ''
+            echo "$@" > mock-output
+            echo "DISABLE_EDITOR_SETUP=''${REPOWISE_DISABLE_EDITOR_SETUP:-unset}" >> mock-output
+          '';
+          mockWrapper = pkgs.callPackage ./wrapper.nix { repowise = mockRepowise; };
         in
         {
+          repowise-nix-wrapper-logic =
+            pkgs.runCommand "repowise-nix-wrapper-logic" { }
+              ''
+                set -eu
+
+                # Test default (no args) -> status
+                mkdir -p repo1
+                cd repo1
+                REPOWISE_REPO="$PWD" ${mockWrapper}/bin/repowise-nix
+                grep -q "status" mock-output
+                cd ..
+
+                # Test generate defaults
+                mkdir -p repo2
+                cd repo2
+                REPOWISE_REPO="$PWD" ${mockWrapper}/bin/repowise-nix generate
+                grep -q "init . --provider openai --model gemini-3.1-flash-lite-preview --embedder gemini --coverage 0.20 --concurrency 4 --yes --no-claude-md --exclude .repowise/\*\* --exclude .git/\*\* --exclude .direnv/\*\*" mock-output
+                grep -q "DISABLE_EDITOR_SETUP=1" mock-output
+                cd ..
+
+                # Test generate with editor setup enabled
+                mkdir -p repo3
+                cd repo3
+                REPOWISE_REPO="$PWD" REPOWISE_EDITOR_SETUP=1 ${mockWrapper}/bin/repowise-nix generate
+                if grep -q "\-\-no-claude-md" mock-output; then
+                  echo "error: --no-claude-md should be disabled when REPOWISE_EDITOR_SETUP=1" >&2
+                  exit 1
+                fi
+                grep -q "DISABLE_EDITOR_SETUP=unset" mock-output
+                cd ..
+
+                # Test index command
+                mkdir -p repo4
+                cd repo4
+                REPOWISE_REPO="$PWD" ${mockWrapper}/bin/repowise-nix index
+                grep -q "init . --index-only --no-claude-md --exclude .repowise/\*\* --exclude .git/\*\* --exclude .direnv/\*\*" mock-output
+                cd ..
+
+                # Test custom models and providers
+                mkdir -p repo5
+                cd repo5
+                REPOWISE_REPO="$PWD" REPOWISE_PROVIDER=anthropic REPOWISE_MODEL=claude-3-5-sonnet-20241022 ${mockWrapper}/bin/repowise-nix generate
+                grep -q "init . --provider anthropic --model claude-3-5-sonnet-20241022" mock-output
+                cd ..
+
+                touch $out
+              '';
+
           repowise-nix-tooling =
             pkgs.runCommand "repowise-nix-tooling" { nativeBuildInputs = [ pkgs.sqlite ]; }
               ''
