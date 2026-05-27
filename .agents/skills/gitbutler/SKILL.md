@@ -45,11 +45,13 @@ but <mutation> ... --status-after
 - Commit + create branch: `but commit <branch> -c -m "<msg>" --changes <id> --status-after`
 - Amend: `but amend <file-id> <commit-id> --status-after`
 - Reorder commits: `but move <source-commit-id> <target-commit-id> --status-after` (**commit IDs**, not branch names)
+- Move a commit to another branch: `but move <source-commit-id> <target-branch-name> --status-after` or `but move <source-commit-id> <target-branch-id> --status-after`. The target branch must be applied/visible in `but status -fv`; if it is currently listed under unapplied branches, run `but apply <target-branch-name> --status-after` first, then move the commit.
 - Stack branches: `but move <branch-name-or-id> <target-branch-name-or-id> --status-after` (**branch names or branch CLI IDs**)
 - Tear off a branch: `but move <branch-name-or-id> zz --status-after` (`zz` = unassigned; branch name or branch CLI ID)
 - Equivalent branch subcommand syntax remains available: `but branch move <branch-name> <target-branch-name>` and `but branch move --unstack <branch-name>`
 - Push: `but push` or `but push <branch-id>`
 - Pull: `but pull --check` then `but pull --status-after`
+- Operation log / recovery: `but oplog` to inspect recent GitButler workspace operations before undo/recovery decisions.
 
 ## Task Recipes
 
@@ -84,6 +86,14 @@ Use GitButler as the commit-composition tool. Do **not** export a patch and appl
 7. Validate, then `but push <branch>`.
 
 If a clean replacement branch is still warranted, prefer GitButler-native reconstruction: create the branch with `but branch new`, then use file tools to edit the working tree and `but commit --changes ...`. Avoid `git apply`; patch replay hides whether you understood the GitButler object model.
+
+### Inspect GitButler operation history
+
+Use `but oplog` when you need to understand or recover recent workspace mutations — especially after move/rub/absorb/unapply/reapply operations, confusing hunk ownership, or before deciding whether `but undo` is safe. It is the GitButler-native operation history and is often more useful than guessing from `git log` alone.
+
+```bash
+but oplog
+```
 
 ### Reorder commits
 
@@ -124,6 +134,29 @@ but branch move --unstack feature/logging
 ```
 
 **Note:** branch stack/tear-off operations use branch **names** (like `feature/frontend`) or branch CLI IDs, while commit reordering uses commit **IDs** (like `c3`). Do NOT use `but undo` to unstack — it may revert more than intended and lose commits.
+
+### Proven-bad applied branch: unapply first, then diagnose
+
+If runtime evidence proves that an applied GitButler branch is the regression — for example `nixos-rebuild --rollback` or unapplying a stack immediately restores the broken service — stop patching forward in the same dirty workspace.
+
+Preferred recovery:
+
+1. Preserve the evidence in the response or notes: which rollback/unapply action restored behavior, and what symptom disappeared.
+2. Unapply the suspect branch/stack from the workspace:
+
+   ```bash
+   but unapply <branch-name> --status-after
+   ```
+
+3. If unapply leaves tiny unassigned residue caused by your attempted repair, inspect it with `but diff`; discard only residue that is clearly from the failed repair:
+
+   ```bash
+   but discard <change-id> --status-after
+   ```
+
+4. Only after the workspace is back to known-good should you decide whether to create a fresh narrower branch, revert a specific commit, or ask for direction.
+
+Do **not** keep surgically editing config after the user has provided decisive rollback evidence that the whole branch is bad. That is patch-forward tunnel vision and risks extending the outage.
 
 ### Stacked dependency / commit-lock recovery
 
