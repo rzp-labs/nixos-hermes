@@ -45,8 +45,10 @@ stdenv.mkDerivation rec {
     if [ "\''${1-}" = "env" ] && [ "\''${2-}" = "setup" ]; then
       repair_vite_plus_shims
       "\$real_vp" "\$@"
+      rc=\$?
       repair_vite_plus_shims
-      exit 0
+      exit \$rc
+    fi
     fi
 
     exec -a "\$0" "\$real_vp" "\$@"
