@@ -12,6 +12,7 @@
     ./hindsight-memory.nix
     ./agentmemory.nix
     ./netdata.nix
+    ./omp-auth-gateway.nix
     ../../modules/system.nix
     ../../modules/packages.nix
     ../../modules/home-manager.nix

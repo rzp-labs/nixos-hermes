@@ -28,6 +28,15 @@
       mode = "0400";
     };
 
+    # Bearer token shared by the loopback OMP auth broker and gateway.
+    # The broker API is localhost-only, but keeping this token declarative
+    # avoids sysd correctness depending on mutable `omp auth-broker token`
+    # state under /home/admin.
+    omp-auth-broker-token = {
+      owner = "admin";
+      mode = "0400";
+    };
+
     # API key for the LAN CLIProxyAPI endpoint used by local OpenAI-compatible
     # LLM providers. The key is consumed at runtime by managed services, not
     # written into the Nix store.
