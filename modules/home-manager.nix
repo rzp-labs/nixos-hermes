@@ -37,6 +37,7 @@ in
         ++ vitePlusToolchain;
     };
 
+    programs.bash.enable = true;
     programs.bash.initExtra = vitePlusBashInit;
   };
 
@@ -48,6 +49,7 @@ in
       packages = vitePlusToolchain;
     };
 
+    programs.bash.enable = true;
     programs.bash.initExtra = vitePlusBashInit;
   };
 }

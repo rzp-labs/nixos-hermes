@@ -210,7 +210,7 @@
                 ln -s ../current/bin/vp "$vp_home/.vite-plus/bin/$tool"
               done
               setup_output=$(HOME="$vp_home" PATH="${hostPkgs.vite-plus}/bin:${hostPkgs.nodejs}/bin:$PATH" '${hostPkgs.vite-plus}/bin/vp' env setup --refresh 2>&1)
-              ! printf '%s\n' "$setup_output" | grep -vq 'File exists (os error 17)'
+              ! printf '%s\n' "$setup_output" | grep -q 'File exists (os error 17)'
               for tool in vp node npm npx vpx vpr; do
                 test "$(readlink "$vp_home/.vite-plus/bin/$tool")" = '${hostPkgs.vite-plus}/bin/vp'
               done

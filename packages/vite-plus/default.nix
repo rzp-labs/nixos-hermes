@@ -39,6 +39,7 @@ stdenv.mkDerivation rec {
           ../current/bin/vp|/nix/store/*-vite-plus-*/bin/vp)
             ${coreutils}/bin/ln -sfn "$out/bin/vp" "\$shim" ;;
         esac
+      done
     }
 
     if [ "\''${1-}" = "env" ] && [ "\''${2-}" = "setup" ]; then
