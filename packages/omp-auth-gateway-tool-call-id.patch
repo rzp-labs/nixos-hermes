@@ -1,19 +1,23 @@
 diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/providers/transform-messages.ts
 --- a/packages/ai/src/providers/transform-messages.ts
 +++ b/packages/ai/src/providers/transform-messages.ts
-@@ -16,6 +16,11 @@ const enum ToolCallStatus {
+@@ -15,6 +15,15 @@
+ 	Resolved = 1,
+ 	/** Tool call was from an aborted message; synthetic result injected, skip real results */
  	Aborted = 2,
- }
- 
++}
++
 +function canonicalToolCallId(id: string): string {
 +	const pipeIndex = id.indexOf("|");
 +	return pipeIndex === -1 ? id : id.slice(0, pipeIndex);
 +}
 +
++function withCanonicalToolCallId(msg: ToolResultMessage, canonicalId: string): ToolResultMessage {
++	return canonicalId === msg.toolCallId ? msg : { ...msg, toolCallId: canonicalId };
+ }
+
  /**
-  * Normalize tool call ID for cross-provider compatibility.
-  * OpenAI Responses API generates IDs that are 450+ chars with special characters like `|`.
-@@ -132,7 +137,9 @@ export function transformMessages<TApi extends Api>(
+@@ -132,7 +141,9 @@
  		return msg;
  	});
  	const realToolResultIds = new Set(
@@ -22,9 +26,9 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
 +			.filter((msg): msg is ToolResultMessage => msg.role === "toolResult")
 +			.map(msg => canonicalToolCallId(msg.toolCallId)),
  	);
- 
+
  	// Anthropic rejects `tool_result` blocks whose `tool_use_id` does not appear in a prior
-@@ -144,7 +151,7 @@ export function transformMessages<TApi extends Api>(
+@@ -144,7 +155,7 @@
  	for (const msg of transformed) {
  		if (msg.role !== "assistant") continue;
  		for (const block of msg.content) {
@@ -32,8 +36,8 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
 +			if (block.type === "toolCall") validToolUseIds.add(canonicalToolCallId(block.id));
  		}
  	}
- 
-@@ -160,7 +167,8 @@ export function transformMessages<TApi extends Api>(
+
+@@ -160,7 +171,8 @@
  	const flushPendingToolCalls = (timestamp: number): void => {
  		if (pendingToolCalls.length === 0) return;
  		for (const tc of pendingToolCalls) {
@@ -43,7 +47,7 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
  				result.push({
  					role: "toolResult",
  					toolCallId: tc.id,
-@@ -169,7 +177,7 @@ export function transformMessages<TApi extends Api>(
+@@ -169,7 +181,7 @@
  					isError: true,
  					timestamp,
  				} as ToolResultMessage);
@@ -52,7 +56,7 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
  			}
  		}
  		pendingToolCalls = [];
-@@ -179,7 +187,8 @@ export function transformMessages<TApi extends Api>(
+@@ -178,7 +190,8 @@
  	const flushPendingAbortedToolCalls = (): void => {
  		if (pendingAbortedTimestamp === undefined) return;
  		for (const tc of pendingAbortedToolCalls.values()) {
@@ -62,7 +66,7 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
  				result.push({
  					role: "toolResult",
  					toolCallId: tc.id,
-@@ -188,7 +197,7 @@ export function transformMessages<TApi extends Api>(
+@@ -187,7 +200,7 @@
  					isError: true,
  					timestamp: pendingAbortedTimestamp,
  				} as ToolResultMessage);
@@ -71,7 +75,7 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
  			}
  		}
  		result.push({
-@@ -214,7 +223,7 @@ export function transformMessages<TApi extends Api>(
+@@ -214,7 +227,7 @@
  				// Keep the assistant message with tool calls intact. If real tool results follow, preserve them;
  				// otherwise synthesize aborted results before the next turn boundary.
  				result.push(msg);
@@ -80,26 +84,39 @@ diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/p
  				pendingAbortedTimestamp = assistantMsg.timestamp;
  				continue;
  			}
-@@ -225,14 +234,15 @@ export function transformMessages<TApi extends Api>(
- 
+@@ -225,16 +238,17 @@
+
  			result.push(msg);
  		} else if (msg.role === "toolResult") {
 -			if (pendingAbortedToolCalls.has(msg.toolCallId)) {
 -				pendingAbortedToolCalls.delete(msg.toolCallId);
 -				toolCallStatus.set(msg.toolCallId, ToolCallStatus.Resolved);
+-				result.push(msg);
 +			const canonicalId = canonicalToolCallId(msg.toolCallId);
 +			if (pendingAbortedToolCalls.has(canonicalId)) {
 +				pendingAbortedToolCalls.delete(canonicalId);
 +				toolCallStatus.set(canonicalId, ToolCallStatus.Resolved);
- 				result.push(msg);
++				result.push(withCanonicalToolCallId(msg, canonicalId));
  				continue;
  			}
- 
+
 -			if (toolCallStatus.get(msg.toolCallId) === ToolCallStatus.Aborted) continue;
-+			if (toolCallStatus.get(canonicalId) === ToolCallStatus.Aborted) continue;
- 
+-
 -			if (!validToolUseIds.has(msg.toolCallId)) {
++			if (toolCallStatus.get(canonicalId) === ToolCallStatus.Aborted) continue;
++
 +			if (!validToolUseIds.has(canonicalId)) {
  				// Orphan `tool_result`: the originating `tool_use` is not present in the
  				// transformed history (typically because handoff/compaction folded the
  				// assistant message into a summary string while the user-side result
+@@ -289,8 +303,8 @@
+ 				continue;
+ 			}
+
+-			toolCallStatus.set(msg.toolCallId, ToolCallStatus.Resolved);
+-			result.push(msg);
++			toolCallStatus.set(canonicalId, ToolCallStatus.Resolved);
++			result.push(withCanonicalToolCallId(msg, canonicalId));
+ 		} else if (msg.role === "user" || msg.role === "developer") {
+ 			flushPendingToolCalls(messageTimestamp);
+ 			flushPendingAbortedToolCalls();
