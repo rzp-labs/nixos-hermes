@@ -1,5 +1,4 @@
 diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/providers/transform-messages.ts
-index 0000000..0000000 100644
 --- a/packages/ai/src/providers/transform-messages.ts
 +++ b/packages/ai/src/providers/transform-messages.ts
 @@ -16,6 +16,11 @@ const enum ToolCallStatus {
