@@ -1,0 +1,106 @@
+diff --git a/packages/ai/src/providers/transform-messages.ts b/packages/ai/src/providers/transform-messages.ts
+index 0000000..0000000 100644
+--- a/packages/ai/src/providers/transform-messages.ts
++++ b/packages/ai/src/providers/transform-messages.ts
+@@ -16,6 +16,11 @@ const enum ToolCallStatus {
+ 	Aborted = 2,
+ }
+ 
++function canonicalToolCallId(id: string): string {
++	const pipeIndex = id.indexOf("|");
++	return pipeIndex === -1 ? id : id.slice(0, pipeIndex);
++}
++
+ /**
+  * Normalize tool call ID for cross-provider compatibility.
+  * OpenAI Responses API generates IDs that are 450+ chars with special characters like `|`.
+@@ -132,7 +137,9 @@ export function transformMessages<TApi extends Api>(
+ 		return msg;
+ 	});
+ 	const realToolResultIds = new Set(
+-		transformed.filter((msg): msg is ToolResultMessage => msg.role === "toolResult").map(msg => msg.toolCallId),
++		transformed
++			.filter((msg): msg is ToolResultMessage => msg.role === "toolResult")
++			.map(msg => canonicalToolCallId(msg.toolCallId)),
+ 	);
+ 
+ 	// Anthropic rejects `tool_result` blocks whose `tool_use_id` does not appear in a prior
+@@ -144,7 +151,7 @@ export function transformMessages<TApi extends Api>(
+ 	for (const msg of transformed) {
+ 		if (msg.role !== "assistant") continue;
+ 		for (const block of msg.content) {
+-			if (block.type === "toolCall") validToolUseIds.add(block.id);
++			if (block.type === "toolCall") validToolUseIds.add(canonicalToolCallId(block.id));
+ 		}
+ 	}
+ 
+@@ -160,7 +167,8 @@ export function transformMessages<TApi extends Api>(
+ 	const flushPendingToolCalls = (timestamp: number): void => {
+ 		if (pendingToolCalls.length === 0) return;
+ 		for (const tc of pendingToolCalls) {
+-			if (!toolCallStatus.has(tc.id) && !realToolResultIds.has(tc.id)) {
++			const canonicalId = canonicalToolCallId(tc.id);
++			if (!toolCallStatus.has(canonicalId) && !realToolResultIds.has(canonicalId)) {
+ 				result.push({
+ 					role: "toolResult",
+ 					toolCallId: tc.id,
+@@ -169,7 +177,7 @@ export function transformMessages<TApi extends Api>(
+ 					isError: true,
+ 					timestamp,
+ 				} as ToolResultMessage);
+-				toolCallStatus.set(tc.id, ToolCallStatus.Resolved);
++				toolCallStatus.set(canonicalId, ToolCallStatus.Resolved);
+ 			}
+ 		}
+ 		pendingToolCalls = [];
+@@ -179,7 +187,8 @@ export function transformMessages<TApi extends Api>(
+ 	const flushPendingAbortedToolCalls = (): void => {
+ 		if (pendingAbortedTimestamp === undefined) return;
+ 		for (const tc of pendingAbortedToolCalls.values()) {
+-			if (!toolCallStatus.has(tc.id)) {
++			const canonicalId = canonicalToolCallId(tc.id);
++			if (!toolCallStatus.has(canonicalId)) {
+ 				result.push({
+ 					role: "toolResult",
+ 					toolCallId: tc.id,
+@@ -188,7 +197,7 @@ export function transformMessages<TApi extends Api>(
+ 					isError: true,
+ 					timestamp: pendingAbortedTimestamp,
+ 				} as ToolResultMessage);
+-				toolCallStatus.set(tc.id, ToolCallStatus.Aborted);
++				toolCallStatus.set(canonicalId, ToolCallStatus.Aborted);
+ 			}
+ 		}
+ 		result.push({
+@@ -214,7 +223,7 @@ export function transformMessages<TApi extends Api>(
+ 				// Keep the assistant message with tool calls intact. If real tool results follow, preserve them;
+ 				// otherwise synthesize aborted results before the next turn boundary.
+ 				result.push(msg);
+-				pendingAbortedToolCalls = new Map(toolCalls.map(toolCall => [toolCall.id, toolCall] as const));
++				pendingAbortedToolCalls = new Map(toolCalls.map(toolCall => [canonicalToolCallId(toolCall.id), toolCall] as const));
+ 				pendingAbortedTimestamp = assistantMsg.timestamp;
+ 				continue;
+ 			}
+@@ -225,14 +234,15 @@ export function transformMessages<TApi extends Api>(
+ 
+ 			result.push(msg);
+ 		} else if (msg.role === "toolResult") {
+-			if (pendingAbortedToolCalls.has(msg.toolCallId)) {
+-				pendingAbortedToolCalls.delete(msg.toolCallId);
+-				toolCallStatus.set(msg.toolCallId, ToolCallStatus.Resolved);
++			const canonicalId = canonicalToolCallId(msg.toolCallId);
++			if (pendingAbortedToolCalls.has(canonicalId)) {
++				pendingAbortedToolCalls.delete(canonicalId);
++				toolCallStatus.set(canonicalId, ToolCallStatus.Resolved);
+ 				result.push(msg);
+ 				continue;
+ 			}
+ 
+-			if (toolCallStatus.get(msg.toolCallId) === ToolCallStatus.Aborted) continue;
++			if (toolCallStatus.get(canonicalId) === ToolCallStatus.Aborted) continue;
+ 
+-			if (!validToolUseIds.has(msg.toolCallId)) {
++			if (!validToolUseIds.has(canonicalId)) {
+ 				// Orphan `tool_result`: the originating `tool_use` is not present in the
+ 				// transformed history (typically because handoff/compaction folded the
+ 				// assistant message into a summary string while the user-side result
