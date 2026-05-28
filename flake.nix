@@ -20,7 +20,7 @@
     # Pin Hermes Agent to maintainer-cut releases instead of default-branch
     # trunk. Upstream moves fast enough that unreleased commits deserve their
     # own validation branch, not a routine package refresh.
-    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.16";
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.28";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     llm-agents.url = "github:numtide/llm-agents.nix";
     # Keep GitButler on a separately validated llm-agents revision while allowing
@@ -176,6 +176,36 @@
             activation-github-auth
             vm-switch-smoke
             ;
+
+          hermes-runtime-packaging =
+            let
+              hostConfig = self.nixosConfigurations.nixos-hermes.config;
+              hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
+              hermesCfg = hostConfig.services.hermes-agent;
+              hermesPackage = hermesCfg.package.override {
+                inherit (hermesCfg) extraDependencyGroups extraPythonPackages;
+              };
+            in
+            pkgs.runCommand "hermes-runtime-packaging" { } ''
+                            set -eu
+                            test '${hermesPackage.version}' = '0.15.0'
+                            PYTHONPATH='${hostPkgs.opusCtypesShim}' '${hermesPackage.passthru.hermesVenv}/bin/python3' - <<'PY'
+              import ctypes.util
+              import importlib.util
+
+              missing = [
+                  name
+                  for name in ["hermes_cli.proxy", "discord", "gateway", "hermes_cli.gateway"]
+                  if importlib.util.find_spec(name) is None
+              ]
+              if missing:
+                  raise SystemExit(f"missing runtime imports: {missing}")
+              opus = ctypes.util.find_library("opus")
+              if not opus or "libopus.so" not in opus:
+                  raise SystemExit(f"opus shim did not resolve libopus: {opus!r}")
+              PY
+                            touch $out
+            '';
 
           repowise-nix-tooling =
             let
