@@ -251,7 +251,7 @@ in
         prev.llm-agents
         // {
           omp = prev.llm-agents.omp.overrideAttrs (
-            _oldAttrs:
+            oldAttrs:
             let
               napiArch =
                 {
@@ -269,6 +269,8 @@ in
               # in the usual runner shape instead: build only the Rust native addon
               # and generated assets, then run the TypeScript entrypoint with Bun.
               autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
+
+              patches = (oldAttrs.patches or [ ]) ++ [ ../packages/omp-auth-gateway-tool-call-id.patch ];
 
               buildPhase = ''
                 runHook preBuild
