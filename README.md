@@ -173,7 +173,7 @@ use the branch itself as the deployment artifact:
 ssh admin@nixos-hermes
 sudo nixos-rebuild test --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
 sudo nixos-rebuild switch --flake \
-  'git+https://github.com/nehpz/nixos-hermes.git?ref=refs/heads/<branch>#nixos-hermes' -L
+  'git+https://github.com/rzp-labs/nixos-hermes.git?ref=refs/heads/<branch>#nixos-hermes' -L
 ```
 
 After the PR lands on `main`, future production rebuilds can use the canonical
@@ -181,7 +181,7 @@ mainline flake:
 
 ```bash
 ssh admin@nixos-hermes
-sudo nixos-rebuild switch --flake github:nehpz/nixos-hermes#nixos-hermes -L
+sudo nixos-rebuild switch --flake github:rzp-labs/nixos-hermes#nixos-hermes -L
 ```
 
 ---

@@ -129,7 +129,7 @@ mkdir -p /etc/secrets
 cp /path/to/age.key /etc/secrets/age.key
 
 # 2. Clone the repo.
-nix shell nixpkgs#git -c git clone https://github.com/nehpz/nixos-hermes /root/nixos-hermes
+nix shell nixpkgs#git -c git clone https://github.com/rzp-labs/nixos-hermes /root/nixos-hermes
 cd /root/nixos-hermes
 
 # 3. Partition, format, and mount every filesystem under /mnt in one shot.
@@ -146,7 +146,7 @@ cp /etc/secrets/age.key /mnt/etc/secrets/age.key
 
 # 5. Install. Everything else (hostname, users, services, bootloader) is
 # declarative.
-nixos-install --flake github:nehpz/nixos-hermes#nixos-hermes \
+nixos-install --flake github:rzp-labs/nixos-hermes#nixos-hermes \
   --option extra-substituters https://cache.flakehub.com \
   --option extra-trusted-public-keys 'cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM='
 
@@ -177,7 +177,7 @@ ls /mnt/boot/nixos/    # must contain files
 
 ```bash
 # Build and activate on the host directly:
-ssh admin@nixos-hermes 'sudo nixos-rebuild switch --flake github:nehpz/nixos-hermes#nixos-hermes'
+ssh admin@nixos-hermes 'sudo nixos-rebuild switch --flake github:rzp-labs/nixos-hermes#nixos-hermes'
 
 # Or push from local checkout:
 nixos-rebuild switch --flake .#nixos-hermes \

@@ -354,7 +354,7 @@ See `docs/guides/HERMES_AGENT_CONFIGURATION.md` for details.
 ## Deployment Topology
 
 ```text
-GitHub (nehpz/nixos-hermes)
+GitHub (rzp-labs/nixos-hermes)
     │
     ├─ push to main → CI: publish flake to FlakeHub
     │
