@@ -1,23 +1,35 @@
 {
   pkgs,
   lib,
+  inputs,
   nixpkgs-llama,
   llm-agents,
+  llm-agents-gitbutler,
   ...
 }:
 
 # Local package overrides — packages not yet available in the pinned nixpkgs channel.
 # Also owns NixOS packaging workarounds that are packaging concerns, not service config.
 let
+  hermesLocales = pkgs.runCommand "hermes-agent-locales" { } ''
+    cp -R ${inputs.hermes-agent}/locales $out
+  '';
+
   # nixpkgs patches CPython with no-ldconfig.patch — ctypes.util._findSoname_ldconfig
   # unconditionally returns None. LD_LIBRARY_PATH and ldconfig cache approaches are
   # both dead. Inject a sitecustomize.py via PYTHONPATH that patches find_library("opus")
   # to return the Nix store path directly before any user code runs.
+  #
+  # Hermes 0.14.0's agent.i18n resolves catalogs at site-packages/locales, but
+  # the Nix package omits the repo-level locales/ directory. Point the runtime
+  # i18n loader at the same locked source revision so gateway slash commands do
+  # not render raw keys such as gateway.resume.list_header.
   opusCtypesShim = pkgs.writeTextDir "sitecustomize.py" ''
     import ctypes.util as _cu
-    import sys as _sys
+    from pathlib import Path as _Path
 
     _OPUS_PATH = "${pkgs.libopus}/lib/libopus.so.0"
+    _HERMES_LOCALES = _Path("${hermesLocales}")
     _orig = _cu.find_library
 
     def find_library(name, *args, **kwargs):
@@ -27,14 +39,13 @@ let
 
     _cu.find_library = find_library
 
-    # Append the writable hindsight venv to sys.path so hindsight-client is importable.
-    # Append (not prepend) so hermes-agent-env packages take precedence — this is required
-    # because pip-installed numpy lacks the NixOS patchelf rpath and will fail to load
-    # libstdc++.so.6 if it appears before the store copy.
-    _hindsight_venv = "/var/lib/hermes/.venv/lib/python${pkgs.python3.pythonVersion}/site-packages"
-    import os as _os
-    if _os.path.isdir(_hindsight_venv) and _hindsight_venv not in _sys.path:
-        _sys.path.append(_hindsight_venv)
+    try:
+        import agent.i18n as _hermes_i18n
+
+        _hermes_i18n._locales_dir = lambda: _HERMES_LOCALES
+        _hermes_i18n.reset_language_cache()
+    except ImportError:
+        pass
   '';
 in
 {
@@ -48,115 +59,417 @@ in
 
   nixpkgs.overlays = [
     # llm-agents.nix provides claude-code, codex, omp, agent-browser, and many more.
-    # Uses shared-nixpkgs overlay so packages build against our pkgs (not blueprint thunks).
-    llm-agents.overlays.shared-nixpkgs
-    (_final: prev: {
+    # Use the default overlay for the fast-moving main input so npm packages build
+    # with llm-agents' own compatible nixpkgs; GitButler is overridden below from
+    # a separate pinned input.
+    llm-agents.overlays.default
+    (final: prev: {
       # Exposed via overlay so consumers (hermes-agent.nix) can reference
       # pkgs.opusCtypesShim without packages.nix coupling to any service.
       inherit opusCtypesShim;
-      # llama-cpp b6981 (pinned nixpkgs) predates Gemma 4 arch support (requires >= b8637).
-      # Override with b8770 from nixpkgs-llama until FlakeHub NixOS/nixpkgs/0 catches up.
-      llama-cpp = (nixpkgs-llama.legacyPackages.${pkgs.system}).llama-cpp;
 
-      llm-agents = prev.llm-agents // {
-        but = prev.llm-agents.but.overrideAttrs (
-          oldAttrs:
-          let
-            patchButSource = ''
-              ${pkgs.python3}/bin/python3 - <<'PY'
-              import tomllib
-              from pathlib import Path
+      linear-cli = prev.buildGoModule rec {
+        pname = "linear-cli";
+        version = "1.8.1";
 
-              cargo_toml = Path("crates/gitbutler-git/Cargo.toml")
-              cargo_toml_text = cargo_toml.read_text()
-              def find_file_id_dependencies(value):
-                  if isinstance(value, dict):
-                      if "file-id" in value:
-                          yield value["file-id"]
-                      for child in value.values():
-                          yield from find_file_id_dependencies(child)
+        src = prev.fetchFromGitHub {
+          owner = "joa23";
+          repo = "linear-cli";
+          rev = "v${version}";
+          hash = "sha256-7Yk/UzbZ5P7awctHwFNVUMEgFN3fUATqHZZm9RdSLfE=";
+        };
 
-              file_id_dependencies = list(find_file_id_dependencies(tomllib.loads(cargo_toml_text)))
-              if file_id_dependencies != [
-                  {
-                      "git": "https://github.com/notify-rs/notify",
-                      "rev": "978fe719b066a8ce76b9a9d346546b1569eecfb6",
-                      "version": "0.2.3",
-                  }
-              ]:
-                  raise RuntimeError(f"unexpected file-id dependencies: {file_id_dependencies!r}")
+        vendorHash = "sha256-Ype8lW/3wbIbbFhPMwXEnm+9tEMPYMqPIxg8ykeK8v0=";
 
-              lines = cargo_toml_text.splitlines(keepends=True)
-              replacement_count = 0
-              for index, line in enumerate(lines):
-                  if line.lstrip().startswith("file-id ="):
-                      if replacement_count:
-                          raise RuntimeError("found multiple file-id dependency lines")
-                      indent = line[: len(line) - len(line.lstrip())]
-                      newline = "\n" if line.endswith("\n") else ""
-                      lines[index] = f'{indent}file-id = "0.2.3"{newline}'
-                      replacement_count += 1
+        subPackages = [ "cmd/linear" ];
+        env.CGO_ENABLED = 0;
+        ldflags = [ "-X github.com/joa23/linear-cli/internal/cli.Version=v${version}" ];
+        preCheck = ''
+          unset LINEAR_API_KEY
+        '';
 
-              cargo_toml_text = "".join(lines)
-              if replacement_count != 1 or "https://github.com/notify-rs/notify" in cargo_toml_text:
-                  raise RuntimeError("failed to normalize file-id dependency in Cargo.toml")
-              cargo_toml.write_text(cargo_toml_text)
-
-              lock = Path("Cargo.lock")
-              text = lock.read_text()
-              blocks = text.split("[[package]]\n")
-              registry_sources = {}
-              package_data = []
-              for block in blocks[1:]:
-                  fields = {}
-                  for line in block.splitlines():
-                      if line.startswith(('name = ', 'version = ', 'source = ')):
-                          key, value = line.split(' = ', 1)
-                          fields[key] = value.strip('"')
-                  name, version, source = fields.get('name'), fields.get('version'), fields.get('source')
-                  identity = (name, version, source)
-                  package_data.append((identity, block))
-                  if name and version and source and source.startswith('registry+'):
-                      registry_sources[(name, version)] = source
-
-              git_sources_to_normalize = {
-                  (name, version, source)
-                  for (name, version, source), _block in package_data
-                  if source and source.startswith('git+') and (name, version) in registry_sources
-              }
-
-              kept = [blocks[0]]
-              for identity, block in package_data:
-                  if identity in git_sources_to_normalize:
-                      continue
-                  kept.append('[[package]]\n' + block)
-
-              lock.write_text("".join(kept))
-              PY
-            '';
-            patchedSrc = pkgs.runCommand "gitbutler-${oldAttrs.version}-but-patched-source" { } ''
-              cp -R ${oldAttrs.src} "$out"
-              chmod -R u+w "$out"
-              cd "$out"
-              ${patchButSource}
-            '';
-          in
-          {
-            # GitButler's lockfile contains git-sourced crates that have the same
-            # name/version as crates.io entries in the same workspace (`file-id`,
-            # `gix-trace`). nixpkgs' fetch-cargo-vendor cannot vendor both
-            # sources under one `<name>-<version>` directory, so normalize these
-            # duplicate git entries to their crates.io source before vendoring
-            # instead of removing the package from the system.
-            src = patchedSrc;
-            cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
-              src = patchedSrc;
-              name = "${oldAttrs.pname}-${oldAttrs.version}-vendor";
-              hash = "sha256-cPcVD5HTvkxb1ylZr+XwPYER9kHLFOkGdqCkNitK8HM=";
-            };
-          }
-        );
+        meta = {
+          description = "Token-efficient Linear CLI optimized for AI agent workflows";
+          homepage = "https://github.com/joa23/linear-cli";
+          license = lib.licenses.mit;
+          mainProgram = "linear";
+          platforms = lib.platforms.linux ++ lib.platforms.darwin;
+        };
       };
+
+      iii-engine = prev.stdenvNoCC.mkDerivation rec {
+        pname = "iii-engine";
+        version = "0.11.2";
+
+        src = prev.fetchzip {
+          url = "https://github.com/iii-hq/iii/releases/download/iii%2Fv${version}/iii-x86_64-unknown-linux-gnu.tar.gz";
+          hash = "sha256-Sg9wnmCWrlPYaE6m6Qla+r3WTi0iSbkiwix1ziYjAsM=";
+        };
+
+        nativeBuildInputs = [ prev.autoPatchelfHook ];
+        buildInputs = [ prev.stdenv.cc.cc.lib ];
+
+        dontConfigure = true;
+        dontBuild = true;
+
+        installPhase = ''
+          runHook preInstall
+          install -Dm0755 iii $out/bin/iii
+          runHook postInstall
+        '';
+
+        meta = {
+          description = "iii engine runtime used by Agent Memory";
+          homepage = "https://github.com/iii-hq/iii";
+          license = lib.licenses.asl20;
+          mainProgram = "iii";
+          platforms = [ "x86_64-linux" ];
+        };
+      };
+
+      repowise = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise;
+      repowise-nix = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise-nix;
+      vite-plus = prev.callPackage ../packages/vite-plus { };
+
+      agentmemory =
+        let
+          version = "0.9.21";
+          src = prev.fetchzip {
+            url = "https://registry.npmjs.org/@agentmemory/agentmemory/-/agentmemory-${version}.tgz";
+            hash = "sha256-5uTldqCNGCXH3Wz1piBwCIfgh1MS1Vy+vsvFQNMlyPA=";
+          };
+          nodeModules = prev.stdenvNoCC.mkDerivation {
+            pname = "agentmemory-node-modules";
+            inherit version src;
+
+            nativeBuildInputs = [
+              prev.cacert
+              prev.nodejs
+            ];
+
+            dontConfigure = true;
+            dontBuild = true;
+
+            installPhase = ''
+              runHook preInstall
+              export HOME="$TMPDIR/home"
+              export npm_config_cache="$TMPDIR/npm-cache"
+              npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+              mkdir -p $out
+              cp -R node_modules $out/node_modules
+              runHook postInstall
+            '';
+
+            outputHashAlgo = "sha256";
+            outputHashMode = "recursive";
+            outputHash = "sha256-UJ+sMdJFJ5GodKjuQVosKnIBXoMLWMmCg4RrbUCwW3Y=";
+          };
+        in
+        prev.stdenv.mkDerivation {
+          pname = "agentmemory";
+          inherit version src;
+
+          nativeBuildInputs = [
+            prev.makeWrapper
+            prev.nodejs
+            prev.pkg-config
+            prev.python3
+          ];
+
+          buildInputs = [ prev.vips ];
+
+          dontConfigure = true;
+          dontBuild = true;
+
+          installPhase = ''
+            runHook preInstall
+            mkdir -p $out/lib/node_modules/@agentmemory/agentmemory
+            cp -R . $out/lib/node_modules/@agentmemory/agentmemory
+            cp -R ${nodeModules}/node_modules $out/lib/node_modules/@agentmemory/agentmemory/node_modules
+            chmod -R u+w $out/lib/node_modules/@agentmemory/agentmemory/node_modules
+
+            # @xenova/transformers is an optional dependency used by local
+            # embeddings. npm's --ignore-scripts keeps the optional dependency
+            # tree vendorable as a fixed-output dependency set, but leaves
+            # sharp without its native addon. Build sharp here, in the normal
+            # package derivation, where references to Nix-provided libvips are
+            # allowed.
+            export HOME="$TMPDIR/home"
+            export npm_config_cache="$TMPDIR/npm-cache"
+            export npm_config_build_from_source=true
+            export npm_config_sharp_libvips_global=true
+            export npm_config_nodedir=${prev.nodejs}
+            npm --prefix $out/lib/node_modules/@agentmemory/agentmemory rebuild sharp --build-from-source
+
+            makeWrapper ${prev.nodejs}/bin/node $out/bin/agentmemory \
+              --prefix PATH : ${prev.lib.makeBinPath [ final.iii-engine ]} \
+              --add-flags $out/lib/node_modules/@agentmemory/agentmemory/dist/cli.mjs
+            runHook postInstall
+          '';
+
+          passthru = {
+            inherit nodeModules;
+            iii-engine = final.iii-engine;
+          };
+
+          meta = {
+            description = "Persistent memory server for AI coding agents";
+            homepage = "https://github.com/rohitg00/agentmemory";
+            license = lib.licenses.asl20;
+            mainProgram = "agentmemory";
+            platforms = [ "x86_64-linux" ];
+          };
+        };
+
+      # Primary FlakeHub nixpkgs still lags a few host-required package versions.
+      # Pull narrow package overrides from nixpkgs-llama until FlakeHub catches up.
+      llamaPackageSet = nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system};
+      bun = final.llamaPackageSet.bun.overrideAttrs (
+        oldAttrs:
+        let
+          bunX86LinuxSrc = prev.fetchurl {
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.14/bun-linux-x64.zip";
+            hash = "sha256-lR7iruhV8IWVruxiJSJqKY0/6oOj3NZGXAnLzN9+hI8=";
+          };
+        in
+        {
+          version = "1.3.14";
+          src = bunX86LinuxSrc;
+          passthru = oldAttrs.passthru // {
+            sources = oldAttrs.passthru.sources // {
+              "x86_64-linux" = bunX86LinuxSrc;
+            };
+          };
+        }
+      );
+      llama-cpp = final.llamaPackageSet.llama-cpp;
+
+      llm-agents =
+        let
+          pinnedGitButlerPackages = llm-agents-gitbutler.packages.${final.stdenv.hostPlatform.system};
+        in
+        prev.llm-agents
+        // {
+          omp = prev.llm-agents.omp.overrideAttrs (
+            oldAttrs:
+            let
+              napiArch =
+                {
+                  x86_64 = "x64";
+                  aarch64 = "arm64";
+                }
+                .${final.stdenv.hostPlatform.parsed.cpu.name}
+                  or (throw "Unsupported OMP native addon CPU: ${final.stdenv.hostPlatform.parsed.cpu.name}");
+              napiPlatform = "${final.stdenv.hostPlatform.parsed.kernel.name}-${napiArch}";
+            in
+            {
+              # The upstream package builds a Bun standalone executable. With Bun
+              # 1.3.14 that ELF segfaults in glibc's loader after Nix autoPatchelf,
+              # before OMP userland code runs. OMP is a Node/Bun CLI, so package it
+              # in the usual runner shape instead: build only the Rust native addon
+              # and generated assets, then run the TypeScript entrypoint with Bun.
+              autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
+
+              patches = (oldAttrs.patches or [ ]) ++ [ ../packages/omp-auth-gateway-tool-call-id.patch ];
+
+              buildPhase = ''
+                runHook preBuild
+
+                export LD_LIBRARY_PATH="${lib.makeLibraryPath [ final.stdenv.cc.cc.lib ]}"
+                export LIBCLANG_PATH="${final.libclang.lib}/lib"
+
+                echo "Building Rust native addon..."
+                cargo build --release -p pi-natives --target ${final.stdenv.hostPlatform.rust.rustcTarget} --target-dir target
+
+                mkdir -p packages/natives/native
+                cp target/${final.stdenv.hostPlatform.rust.rustcTarget}/release/libpi_natives.so \
+                  packages/natives/native/pi_natives.${napiPlatform}.node
+
+                napiBin="$(pwd)/node_modules/.bin/napi"
+                if [ -x "$napiBin" ]; then
+                  "$napiBin" build \
+                    --manifest-path crates/pi-natives/Cargo.toml \
+                    --package-json-path packages/natives/package.json \
+                    --platform \
+                    --no-js \
+                    --dts index.d.ts \
+                    -o packages/natives/native \
+                    --release \
+                    || echo "napi CLI post-processing failed; using cargo output directly"
+                fi
+
+                if [ -f packages/natives/scripts/gen-enums.ts ] && \
+                   [ -f packages/natives/native/index.d.ts ]; then
+                  bun packages/natives/scripts/gen-enums.ts
+                fi
+
+                echo "Generating docs index..."
+                bun packages/coding-agent/scripts/generate-docs-index.ts
+
+                runHook postBuild
+              '';
+
+              installPhase = ''
+                runHook preInstall
+
+                mkdir -p $out/lib/omp/source $out/bin
+                cp -R package.json bun.lock node_modules packages $out/lib/omp/source/
+
+                makeWrapper ${final.bun}/bin/bun $out/bin/omp \
+                  --add-flags "$out/lib/omp/source/packages/coding-agent/src/cli.ts" \
+                  --set PI_SKIP_VERSION_CHECK 1 \
+                  --prefix LD_LIBRARY_PATH : ${
+                    lib.makeLibraryPath [
+                      final.zlib
+                      final.stdenv.cc.cc.lib
+                    ]
+                  }
+
+                runHook postInstall
+              '';
+            }
+          );
+          but = pinnedGitButlerPackages.but.overrideAttrs (
+            oldAttrs:
+            let
+              patchButSource = ''
+                ${pkgs.python3}/bin/python3 - <<'PY'
+                import tomllib
+                from pathlib import Path
+
+                cargo_toml = Path("crates/gitbutler-git/Cargo.toml")
+                cargo_toml_text = cargo_toml.read_text()
+                def find_file_id_dependencies(value):
+                    if isinstance(value, dict):
+                        if "file-id" in value:
+                            yield value["file-id"]
+                        for child in value.values():
+                            yield from find_file_id_dependencies(child)
+
+                file_id_dependencies = list(find_file_id_dependencies(tomllib.loads(cargo_toml_text)))
+                if file_id_dependencies != [
+                    {
+                        "git": "https://github.com/notify-rs/notify",
+                        "rev": "978fe719b066a8ce76b9a9d346546b1569eecfb6",
+                        "version": "0.2.3",
+                    }
+                ]:
+                    raise RuntimeError(f"unexpected file-id dependencies: {file_id_dependencies!r}")
+
+                lines = cargo_toml_text.splitlines(keepends=True)
+                replacement_count = 0
+                for index, line in enumerate(lines):
+                    if line.lstrip().startswith("file-id ="):
+                        if replacement_count:
+                            raise RuntimeError("found multiple file-id dependency lines")
+                        indent = line[: len(line) - len(line.lstrip())]
+                        newline = "\n" if line.endswith("\n") else ""
+                        lines[index] = f'{indent}file-id = "0.2.3"{newline}'
+                        replacement_count += 1
+
+                cargo_toml_text = "".join(lines)
+                if replacement_count != 1 or "https://github.com/notify-rs/notify" in cargo_toml_text:
+                    raise RuntimeError("failed to normalize file-id dependency in Cargo.toml")
+                cargo_toml.write_text(cargo_toml_text)
+
+                workspace_toml = Path("Cargo.toml")
+                workspace_toml_text = workspace_toml.read_text()
+                old_gix_dependency = (
+                    'gix = { version = "0.83.0", git = "https://github.com/GitoxideLabs/gitoxide", '
+                    'rev = "575113dfb10b3ba12eb57f57a81b241e773968bd", default-features = false, features = ['
+                )
+                new_gix_dependency = 'gix = { version = "0.83.0", default-features = false, features = ['
+                if workspace_toml_text.count(old_gix_dependency) != 1:
+                    raise RuntimeError("unexpected workspace gix dependency")
+                workspace_toml.write_text(workspace_toml_text.replace(old_gix_dependency, new_gix_dependency))
+
+                lock = Path("Cargo.lock")
+                text = lock.read_text()
+                blocks = text.split("[[package]]\n")
+                registry_sources = {}
+                package_data = []
+                for block in blocks[1:]:
+                    fields = {}
+                    for line in block.splitlines():
+                        if line.startswith(('name = ', 'version = ', 'source = ')):
+                            key, value = line.split(' = ', 1)
+                            fields[key] = value.strip('"')
+                    name, version, source = fields.get('name'), fields.get('version'), fields.get('source')
+                    identity = (name, version, source)
+                    package_data.append((identity, block))
+                    if name and version and source and source.startswith('registry+'):
+                        registry_sources[(name, version)] = source
+
+                git_sources_to_normalize = {
+                    (name, version, source)
+                    for (name, version, source), _block in package_data
+                    if source and source.startswith('git+') and (name, version) in registry_sources
+                }
+
+                dependency_replacements = 0
+                for name, version, git_source in git_sources_to_normalize:
+                    registry_source = registry_sources[(name, version)]
+                    dependency_git_source = git_source.split('#', 1)[0]
+                    old_dependency = f'"{name} {version} ({dependency_git_source})"'
+                    new_dependency = f'"{name} {version} ({registry_source})"'
+                    count = text.count(old_dependency)
+                    if count:
+                        text = text.replace(old_dependency, new_dependency)
+                        dependency_replacements += count
+
+                # Re-split blocks if text was modified by dependency replacements
+                if dependency_replacements:
+                    blocks = text.split("[[package]]\n")
+
+                kept = [blocks[0]]
+                removed_blocks = 0
+                for i, block in enumerate(blocks[1:]):
+                    # If dependency replacements happened, we must re-parse because
+                    # 'dependencies' lines in the block might have changed.
+                    # However, 'name', 'version', and 'source' should be identical
+                    # to what we parsed in the first pass since they are what
+                    # defines the package block itself, not its dependencies.
+                    identity, _orig_block = package_data[i]
+                    if identity in git_sources_to_normalize:
+                        removed_blocks += 1
+                        continue
+                    kept.append('[[package]]\n' + block)
+
+                if removed_blocks != len(git_sources_to_normalize):
+                    raise RuntimeError(
+                        f"removed {removed_blocks} git package blocks, expected {len(git_sources_to_normalize)}"
+                    )
+                if dependency_replacements == 0:
+                    raise RuntimeError("no dependency source annotations normalized")
+
+                lock.write_text("".join(kept))
+                PY
+              '';
+              patchedSrc = pkgs.runCommand "gitbutler-${oldAttrs.version}-but-patched-source" { } ''
+                cp -R ${oldAttrs.src} "$out"
+                chmod -R u+w "$out"
+                cd "$out"
+                ${patchButSource}
+              '';
+            in
+            {
+              # GitButler's lockfile contains git-sourced crates that have the same
+              # name/version as crates.io entries in the same workspace (`file-id`,
+              # `gix-trace`). nixpkgs' fetch-cargo-vendor cannot vendor both
+              # sources under one `<name>-<version>` directory, so normalize these
+              # duplicate git entries to their crates.io source before vendoring
+              # instead of removing the package from the system.
+              src = patchedSrc;
+              cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
+                src = patchedSrc;
+                name = "${oldAttrs.pname}-${oldAttrs.version}-vendor";
+                # Vendored for llm-agents-gitbutler rev a7ad64dd500337232a35b5db16527475e8eec9a2.
+                # Recompute from that pinned input whenever llm-agents-gitbutler moves.
+                hash = "sha256-Pz+LAc7jM1JCoA+73FC4C+aEQdpYSfuy7t0/O1RHH9E=";
+              };
+            }
+          );
+        };
     })
   ];
 }
