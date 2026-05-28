@@ -25,7 +25,7 @@ Use GitButler CLI (`but`) as the default version-control interface.
 
 ```bash
 # 1. Inspect state and gather IDs
-but status -fv
+but status -fv --json
 
 # 2. If new branch needed:
 but branch new <name>
@@ -33,13 +33,21 @@ but branch new <name>
 # 3. Edit files (Edit/Write tools)
 
 # 4. Refresh IDs if needed
-but status -fv
+but status -fv --json
 
 # 5. Perform mutation with IDs from status/diff/show
 but <mutation> ... --status-after
 ```
 
 ## Command Patterns
+
+Add `--json` when consuming GitButler output programmatically. It is easier to parse than compact TUI-style text and avoids brittle scraping. Human-readable output is still fine when showing state directly to a person.
+
+- Status: `but status -fv --json`
+- Diff: `but diff --json` or `but diff <change-id> --json`
+- Branch detail: `but show <branch-id> --json` or `but branch show <branch-name> -f --json`
+- Pull check: `but pull --check --json`
+- Branch list: `but branch list --json`
 
 - Commit: `but commit <branch> -m "<msg>" --changes <id>,<id> --status-after`
 - Commit + create branch: `but commit <branch> -c -m "<msg>" --changes <id> --status-after`
@@ -50,7 +58,7 @@ but <mutation> ... --status-after
 - Tear off a branch: `but move <branch-name-or-id> zz --status-after` (`zz` = unassigned; branch name or branch CLI ID)
 - Equivalent branch subcommand syntax remains available: `but branch move <branch-name> <target-branch-name>` and `but branch move --unstack <branch-name>`
 - Push: `but push` or `but push <branch-id>`
-- Pull: `but pull --check` then `but pull --status-after`
+- Pull: `but pull --check --json` then `but pull --status-after --json`
 - Operation log / recovery: `but oplog` to inspect recent GitButler workspace operations before undo/recovery decisions.
 
 ## Task Recipes

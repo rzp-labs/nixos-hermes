@@ -139,7 +139,7 @@ hermes webhook subscribe github-prs \
   --deliver origin
 ```
 
-Register the webhook in the nehpz/nixos-hermes repo:
+Register the webhook in the rzp-labs/nixos-hermes repo:
 - Payload URL: `https://hermes-webhook.rzp.one/<subscription-path>`
 - Content type: `application/json`
 - Secret: the HMAC secret from sops
@@ -167,7 +167,7 @@ The prompt should:
 Draft prompt:
 
 ```
-A GitHub event has arrived for nehpz/nixos-hermes.
+A GitHub event has arrived for rzp-labs/nixos-hermes.
 
 Event: {action} on PR #{pull_request.number} "{pull_request.title}"
 PR author: {pull_request.user.login}
