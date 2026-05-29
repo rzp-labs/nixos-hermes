@@ -71,6 +71,11 @@
                 grep -q -- 'repowise reindex --embedder' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- '"\$@" .' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'repowise search "\$@" .' '${repowise-nix}/bin/repowise-nix'
+                grep -q -- 'nix-reachability' '${repowise-nix}/bin/repowise-nix'
+
+                grep -q -- 'nix_eval_output_position' '${./nix-reachability.py}'
+                grep -q -- 'nix_eval_flake_input' '${./nix-reachability.py}'
+                grep -q -- 'nix_eval_option_definition' '${./nix-reachability.py}'
                 if REPOWISE_REPO="$PWD/missing" '${repowise-nix}/bin/repowise-nix' status 2>err; then
                   echo 'expected missing REPOWISE_REPO to fail' >&2
                   exit 1

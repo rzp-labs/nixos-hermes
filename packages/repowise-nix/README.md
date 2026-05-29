@@ -23,6 +23,7 @@ repowise-nix refresh --test-run
 repowise-nix reindex
 repowise-nix search "workspace task backend" --mode semantic --limit 5
 repowise-nix dead-code
+repowise-nix nix-reachability --nixos-config nixos-hermes
 ```
 
 The wrapper passes through commands it does not special-case, so upstream commands such as `dead-code`, `health`, and `risk` stay available without reimplementing the CLI surface. Excludes are applied only to wrapper-managed indexing/generation commands where upstream accepts `--exclude`.
@@ -55,9 +56,31 @@ REPOWISE_EXTRA_EXCLUDES='docs/spikes/repowise-nix/artifacts/**:vendor/**' \
 REPOWISE_EDITOR_SETUP=1 repowise-nix generate --test-run
 ```
 
-## Supported Nix analysis patterns
+## Native Nix reachability adapter
 
-The local Repowise patch is static-only. It does not run `nix` and does not try to evaluate arbitrary expressions. Supported Nix reachability patterns are intentionally boring:
+`repowise-nix nix-reachability` is the first-class Nix adapter. It invokes
+`nix eval` against the target flake and emits JSON reachability evidence from
+evaluated flake outputs, local flake inputs, and selected NixOS module option
+definition locations. This is the preferred signal for Nix dead-code decisions
+because it is evaluator-derived, not a directory-name heuristic.
+
+Example:
+
+```bash
+REPOWISE_REPO=/path/to/flake \
+  repowise-nix nix-reachability --nixos-config nixos-hermes
+```
+
+The output uses proof-typed edges such as `nix_eval_output_position`,
+`nix_eval_flake_input`, `nix_eval_module`, and
+`nix_eval_option_definition`. Repowise graph/dead-code integration should treat
+those as stronger evidence than static tree-sitter path extraction.
+
+## Static Nix analysis patterns
+
+The local Repowise patch also contains static fallback support. Static analysis
+does not run `nix` and does not try to evaluate arbitrary expressions.
+Supported Nix reachability patterns are intentionally boring:
 
 - `imports = [ ./module.nix ../other.nix ];`
 - `import ./file.nix`
@@ -65,7 +88,6 @@ The local Repowise patch is static-only. It does not run `nix` and does not try 
 - directory fallbacks for `./foo` as `foo.nix`, `foo/default.nix`, then `foo/flake.nix`
 - selected `evalModule` / `.lib.evalModule` path arguments such as `treefmt-nix.lib.evalModule pkgs ./treefmt.nix`
 - local flake input URLs like `url = "path:./packages/tool"`, preferring nested `flake.nix`
-- common flake/infrastructure roots such as `flake.nix`, `default.nix`, `treefmt.nix`, `packages`, `modules`, `hosts`, and `tests`
 
 Unsupported dynamic expressions degrade conservatively: they should not create high-confidence deletion recommendations just because static parsing cannot prove the edge.
 

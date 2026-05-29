@@ -36,6 +36,7 @@ repowise-nix refresh --test-run  # alias for generate
 repowise-nix reindex
 repowise-nix search "hermes workspace task backend" --mode semantic --limit 5
 repowise-nix dead-code
+repowise-nix nix-reachability --nixos-config nixos-hermes
 ```
 
 The wrapper defaults to `$PWD`, not a Hermes or NixOS host path. Override with:
@@ -66,11 +67,29 @@ The OpenAI provider default matches Repowise's OpenAI-compatible SDK path. This 
 
 Do not commit keys. Use environment or sops-managed runtime files only.
 
-## Nix static-analysis support
+## Native Nix reachability support
 
-The packaged `repowise` includes a source-level Nix support patch. It is static-only: it never runs `nix` during graph/dead-code analysis.
+`repowise-nix nix-reachability` is the first-class Nix adapter. It runs
+bounded `nix eval` queries against the target flake and emits proof-typed JSON
+edges from evaluated flake outputs, local flake inputs, and selected NixOS
+module option definition locations. Use it when judging Nix file reachability;
+it is evaluator evidence, not a heuristic suppression list.
 
-Supported reachability patterns include module import lists, direct `import ./file.nix`, `callPackage` path arguments, directory fallbacks (`foo.nix`, `foo/default.nix`, `foo/flake.nix`), selected `evalModule`/treefmt-style path arguments, local `path:./...` flake inputs, and common flake/infrastructure roots. Dynamic expressions degrade conservatively instead of becoming high-confidence deletion advice.
+```bash
+REPOWISE_REPO=/var/lib/hermes/workspace/nixos-hermes \
+  repowise-nix nix-reachability --nixos-config nixos-hermes
+```
+
+The initial adapter intentionally does not build derivations or require secrets.
+It proves the evaluated surface it asks for; it does not claim global truth for
+outputs or Nix expressions outside that surface.
+
+## Nix static-analysis fallback
+
+The packaged `repowise` also includes a source-level Nix support patch. It is
+static-only: it never runs `nix` during graph/dead-code analysis.
+
+Supported reachability patterns include module import lists, direct `import ./file.nix`, `callPackage` path arguments, directory fallbacks (`foo.nix`, `foo/default.nix`, `foo/flake.nix`), selected `evalModule`/treefmt-style path arguments, and local `path:./...` flake inputs. Dynamic expressions degrade conservatively instead of becoming high-confidence deletion advice.
 
 Patch stack boundary: `repowise-nix-language-support.patch` owns Nix parsing/resolver/dead-code behavior and tests; `repowise-status-stale-schema-warning.patch` owns stale-index UX only. Keep future changes source-level and rebaseable.
 

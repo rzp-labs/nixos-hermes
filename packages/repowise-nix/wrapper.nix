@@ -1,12 +1,18 @@
 {
   lib,
+  nix,
   repowise,
+  python3,
   writeShellApplication,
 }:
 
 writeShellApplication {
   name = "repowise-nix";
-  runtimeInputs = [ repowise ];
+  runtimeInputs = [
+    nix
+    repowise
+    python3
+  ];
   text = ''
     set -euo pipefail
 
@@ -59,6 +65,9 @@ writeShellApplication {
 
     cd "$repo"
     case "$command" in
+      nix-reachability)
+        exec python ${./nix-reachability.py} . "$@"
+        ;;
       generate|refresh)
         exec repowise init . \
           --provider "''${REPOWISE_PROVIDER:-openai}" \
