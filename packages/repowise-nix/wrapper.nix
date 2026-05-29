@@ -67,7 +67,7 @@ writeShellApplication {
     case "$command" in
       dead-code)
         export REPOWISE_NIX_REACHABILITY_SCRIPT=${./nix-reachability.py}
-        exec python ${./native-dead-code.py} "$@"
+        exec python ${./nix_dead_code_cmd.py} "$@"
         ;;
       nix-reachability)
         exec python ${./nix-reachability.py} . "$@"

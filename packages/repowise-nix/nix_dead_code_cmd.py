@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repowise dead-code wrapper with native Nix reachability evidence.
+"""``repowise-nix dead-code`` — Nix-aware dead-code command wrapper.
 
 For Nix flakes, this treats `nix-reachability.py` as the authority for Nix file
 reachability. If evaluator evidence cannot be collected, analysis fails hard
@@ -41,7 +41,7 @@ def _strip_format_args(args: list[str]) -> tuple[list[str], str]:
 
 def _is_wrapper_reachable(finding: dict) -> bool:
     return finding.get("file_path") in {
-        "packages/repowise-nix/native-dead-code.py",
+        "packages/repowise-nix/nix_dead_code_cmd.py",
         "packages/repowise-nix/nix-reachability.py",
     }
 
