@@ -55,6 +55,22 @@ REPOWISE_EXTRA_EXCLUDES='docs/spikes/repowise-nix/artifacts/**:vendor/**' \
 REPOWISE_EDITOR_SETUP=1 repowise-nix generate --test-run
 ```
 
+## Supported Nix analysis patterns
+
+The local Repowise patch is static-only. It does not run `nix` and does not try to evaluate arbitrary expressions. Supported Nix reachability patterns are intentionally boring:
+
+- `imports = [ ./module.nix ../other.nix ];`
+- `import ./file.nix`
+- `callPackage ./package.nix { }` and selected `.callPackage` receivers
+- directory fallbacks for `./foo` as `foo.nix`, `foo/default.nix`, then `foo/flake.nix`
+- selected `evalModule` / `.lib.evalModule` path arguments such as `treefmt-nix.lib.evalModule pkgs ./treefmt.nix`
+- local flake input URLs like `url = "path:./packages/tool"`, preferring nested `flake.nix`
+- common flake/infrastructure roots such as `flake.nix`, `default.nix`, `treefmt.nix`, `packages`, `modules`, `hosts`, and `tests`
+
+Unsupported dynamic expressions degrade conservatively: they should not create high-confidence deletion recommendations just because static parsing cannot prove the edge.
+
+Patch organization stays source-level and rebaseable: `repowise-nix-language-support.patch` carries Nix parsing/resolver/dead-code behavior plus tests; `repowise-status-stale-schema-warning.patch` only carries stale local-index UX. No generated/minified/dist surgery is part of the durable patch path.
+
 ## Safety model
 
 By default `repowise-nix` disables Repowise editor setup:

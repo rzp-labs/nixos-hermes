@@ -66,6 +66,14 @@ The OpenAI provider default matches Repowise's OpenAI-compatible SDK path. This 
 
 Do not commit keys. Use environment or sops-managed runtime files only.
 
+## Nix static-analysis support
+
+The packaged `repowise` includes a source-level Nix support patch. It is static-only: it never runs `nix` during graph/dead-code analysis.
+
+Supported reachability patterns include module import lists, direct `import ./file.nix`, `callPackage` path arguments, directory fallbacks (`foo.nix`, `foo/default.nix`, `foo/flake.nix`), selected `evalModule`/treefmt-style path arguments, local `path:./...` flake inputs, and common flake/infrastructure roots. Dynamic expressions degrade conservatively instead of becoming high-confidence deletion advice.
+
+Patch stack boundary: `repowise-nix-language-support.patch` owns Nix parsing/resolver/dead-code behavior and tests; `repowise-status-stale-schema-warning.patch` owns stale-index UX only. Keep future changes source-level and rebaseable.
+
 ## Index hygiene
 
 For wrapper-managed `index`, `generate`, and `refresh`, the wrapper excludes generic transient paths and disables Repowise's editor setup layer by default (`REPOWISE_DISABLE_EDITOR_SETUP=1` plus `--no-claude-md`) so indexing stays a repo-orientation operation instead of silently rewriting editor, MCP, or Claude Code config:
