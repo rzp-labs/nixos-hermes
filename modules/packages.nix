@@ -24,12 +24,18 @@ let
   # the Nix package omits the repo-level locales/ directory. Point the runtime
   # i18n loader at the same locked source revision so gateway slash commands do
   # not render raw keys such as gateway.resume.list_header.
+  #
+  # Hermes 0.15.0's pyproject still includes only `hermes_cli`, not
+  # `hermes_cli.*`, so uv2nix omits the new `hermes_cli.proxy` subpackage from
+  # the sealed environment. Extend the installed package path to the locked
+  # source tree instead of patching generated/bundled output.
   opusCtypesShim = pkgs.writeTextDir "sitecustomize.py" ''
     import ctypes.util as _cu
     from pathlib import Path as _Path
 
     _OPUS_PATH = "${pkgs.libopus}/lib/libopus.so.0"
     _HERMES_LOCALES = _Path("${hermesLocales}")
+    _HERMES_CLI_SOURCE = "${inputs.hermes-agent}/hermes_cli"
     _orig = _cu.find_library
 
     def find_library(name, *args, **kwargs):
@@ -38,6 +44,14 @@ let
         return _orig(name, *args, **kwargs)
 
     _cu.find_library = find_library
+
+    try:
+        import hermes_cli as _hermes_cli
+
+        if hasattr(_hermes_cli, "__path__") and _HERMES_CLI_SOURCE not in _hermes_cli.__path__:
+            _hermes_cli.__path__.append(_HERMES_CLI_SOURCE)
+    except ImportError:
+        pass
 
     try:
         import agent.i18n as _hermes_i18n

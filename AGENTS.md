@@ -134,7 +134,7 @@ Right tool, right job. Pick the lightest tool that covers the change.
 | Activation script change | `nix build .#checks.x86_64-linux.<test>` (VM) | No |
 | Real secrets / hardware / network | `nixos-rebuild test` | Yes |
 
-For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home/admin/workspace/nixos-hermes` with all unrelated GitButler branches unapplied and only the target branch under test applied. This proves the local flake without contamination from the agent workspace's other applied stacks. Live `nixos-rebuild switch` remains FlakeHub-based, not local-workspace based, unless explicitly authorized otherwise.
+For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home/admin/workspace/nixos-hermes` with all unrelated GitButler branches unapplied and only the target branch under test applied. This proves the local flake without contamination from the agent workspace's other applied stacks. Always run `sudo nixos-rebuild test --flake .#nixos-hermes -L` before any persistent switch so reboot rollback remains available if the tested generation misbehaves. Before live-host mutation, take a ZFS recovery snapshot such as `sudo zfs snapshot -r rpool@pre-<change>-$(date -u +%Y%m%dT%H%M%SZ)` so filesystem/runtime state has a known-good restore point, not just Nix generation rollback. Live `nixos-rebuild switch` remains FlakeHub-based, not local-workspace based, unless explicitly authorized otherwise: after local host validation passes, open/review/merge the PR, wait for CI and FlakeHub publication, then switch from the remote published flake.
 
 The VM tests live under `tests/` and run via QEMU — no root needed.
 `checks.x86_64-linux.vm-switch-smoke` is the heaviest repo-owned smoke:

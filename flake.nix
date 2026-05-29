@@ -20,7 +20,7 @@
     # Pin Hermes Agent to maintainer-cut releases instead of default-branch
     # trunk. Upstream moves fast enough that unreleased commits deserve their
     # own validation branch, not a routine package refresh.
-    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.16";
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.28";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     llm-agents.url = "github:numtide/llm-agents.nix";
     # Keep GitButler on a separately validated llm-agents revision while allowing
@@ -177,6 +177,36 @@
             vm-switch-smoke
             ;
 
+          hermes-runtime-packaging =
+            let
+              hostConfig = self.nixosConfigurations.nixos-hermes.config;
+              hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
+              hermesCfg = hostConfig.services.hermes-agent;
+              hermesPackage = hermesCfg.package.override {
+                inherit (hermesCfg) extraDependencyGroups extraPythonPackages;
+              };
+            in
+            pkgs.runCommand "hermes-runtime-packaging" { } ''
+                            set -eu
+                            test '${hermesPackage.version}' = '0.15.0'
+                            PYTHONPATH='${hostPkgs.opusCtypesShim}' '${hermesPackage.passthru.hermesVenv}/bin/python3' - <<'PY'
+              import ctypes.util
+              import importlib.util
+
+              missing = [
+                  name
+                  for name in ["hermes_cli.proxy", "discord", "gateway", "hermes_cli.gateway"]
+                  if importlib.util.find_spec(name) is None
+              ]
+              if missing:
+                  raise SystemExit(f"missing runtime imports: {missing}")
+              opus = ctypes.util.find_library("opus")
+              if not opus or "libopus.so" not in opus:
+                  raise SystemExit(f"opus shim did not resolve libopus: {opus!r}")
+              PY
+                            touch $out
+            '';
+
           repowise-nix-tooling =
             let
               hostConfig = self.nixosConfigurations.nixos-hermes.config;
@@ -293,6 +323,7 @@
               env = unit.environment;
               service = unit.serviceConfig;
               stateDirectories = pkgs.lib.toList service.StateDirectory;
+              cacheDirectories = pkgs.lib.toList service.CacheDirectory;
               hermesMcp = hostConfig.services.hermes-agent.mcpServers.agentmemory;
               hermesPluginNames = builtins.concatStringsSep "\n" (
                 map toString hostConfig.services.hermes-agent.extraPlugins
@@ -303,7 +334,7 @@
               set -eu
               test '${if hostConfig.services.agentmemory.enable then "true" else "false"}' = 'true'
               test '${if hostConfig.services.agentmemory.llm.enable then "true" else "false"}' = 'true'
-              test '${hostConfig.services.agentmemory.llm.baseUrl}' = 'http://10.0.0.102:8317'
+              test '${hostConfig.services.agentmemory.llm.baseUrl}' = 'http://127.0.0.1:4000'
               test '${hostConfig.services.agentmemory.llm.model}' = 'gpt-5.4-mini'
               test '${toString hostConfig.services.agentmemory.llm.timeoutMs}' = '120000'
               test '${hostConfig.services.agentmemory.llm.embeddingProvider}' = 'local'
@@ -321,11 +352,16 @@
               test '${env.CONSOLIDATION_ENABLED}' = 'true'
               test '${env.AGENTMEMORY_INJECT_CONTEXT}' = 'true'
               test '${env.AGENTMEMORY_TOOLS}' = 'core'
-              test '${env.OPENAI_BASE_URL}' = 'http://10.0.0.102:8317'
+              test '${env.OPENAI_BASE_URL}' = 'http://127.0.0.1:4000'
               test '${env.OPENAI_MODEL}' = 'gpt-5.4-mini'
               test '${env.AGENTMEMORY_LLM_TIMEOUT_MS}' = '120000'
               test '${env.OPENAI_TIMEOUT_MS}' = '120000'
               test '${env.EMBEDDING_PROVIDER}' = 'local'
+              test '${env.TRANSFORMERS_CACHE}' = '/var/cache/agentmemory/transformers'
+              test '${env.XDG_CACHE_HOME}' = '/var/cache/agentmemory'
+              grep -q -- 'agentmemory-transformers-runtime.mjs' <<'EOF'
+              ${env.NODE_OPTIONS}
+              EOF
               test '${if builtins.hasAttr "OPENAI_API_KEY" env then "true" else "false"}' = 'false'
               test '${env.III_REST_PORT}' = '3111'
               test '${env.III_STREAMS_PORT}' = '3112'
@@ -334,11 +370,11 @@
               test '${env.III_ENGINE_URL}' = 'ws://127.0.0.1:49134'
               test '${service.User}' = 'agentmemory'
               test '${service.Group}' = 'agentmemory'
-              test '${hostConfig.sops.secrets.cliproxyapi-key.owner}' = 'agentmemory'
-              test '${hostConfig.sops.secrets.cliproxyapi-key.group}' = 'agentmemory'
-              test '${hostConfig.sops.secrets.cliproxyapi-key.mode}' = '0400'
+
               test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
+              test '${builtins.concatStringsSep " " cacheDirectories}' = 'agentmemory agentmemory/transformers'
               test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
+              test '${service.TimeoutStopSec}' = '10s'
               test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
               test '${builtins.concatStringsSep " " hermesMcp.args}' = 'mcp'
               test '${hermesMcp.env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
@@ -358,8 +394,8 @@
               test '${if service.ProtectHome then "true" else "false"}' = 'true'
               grep -q -- '/bin/iii --config ' '${service.ExecStart}'
               grep -q -- 'export OPENAI_API_KEY=' '${service.ExecStart}'
-              grep -q -- '${hostConfig.sops.secrets.cliproxyapi-key.path}' '${service.ExecStart}'
-              grep -q -- 'was not readable after 30s' '${service.ExecStart}'
+              grep -q -- 'export OPENAI_API_KEY=local-auth-gateway' '${service.ExecStart}'
+              test '${if builtins.hasAttr "ExecStartPre" service then "true" else "false"}' = 'false'
               grep -q -- '${pkgs.bash}/bin' <<'EOF'
               ${env.PATH}
               EOF
@@ -369,6 +405,13 @@
               grep -q -- 'agentmemory-iii-config.yaml' <<'EOF'
               ${builtins.readFile service.ExecStart}
               EOF
+              grep -q -- 'cron_store.db' '${builtins.head unit.restartTriggers}'
+              grep -q -- 'state_store.db' '${builtins.head unit.restartTriggers}'
+              grep -q -- 'stream_store' '${builtins.head unit.restartTriggers}'
+              if grep -qi -- 'in_memory' '${builtins.head unit.restartTriggers}'; then
+                echo 'agentmemory iii config must not use in_memory stores' >&2
+                exit 1
+              fi
               grep -q -- 'agentmemory-ready-check' <<'EOF'
               ${toString service.ExecStartPost}
               EOF

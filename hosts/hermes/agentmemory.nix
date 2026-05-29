@@ -10,6 +10,8 @@ let
   cfg = config.services.agentmemory;
   stateDir = "/var/lib/agentmemory";
   dataDir = "${stateDir}/data";
+  cacheDir = "/var/cache/agentmemory";
+  transformersCacheDir = "${cacheDir}/transformers";
   restPort = 3111;
   streamsPort = 3112;
   normalizedLlmBaseUrl = lib.removeSuffix "/" cfg.llm.baseUrl;
@@ -17,20 +19,22 @@ let
   enginePort = 49134;
   yaml = pkgs.formats.yaml { };
   agentmemoryRoot = "${cfg.package}/lib/node_modules/@agentmemory/agentmemory";
+  transformersRuntimeConfig = pkgs.writeText "agentmemory-transformers-runtime.mjs" ''
+    // Import the package's ESM main file so this mutates the same env object
+    // used by Agent Memory's later @xenova/transformers pipeline imports.
+    import { env } from "${agentmemoryRoot}/node_modules/@xenova/transformers/src/transformers.js";
+
+    env.cacheDir = process.env.TRANSFORMERS_CACHE || "${transformersCacheDir}";
+    env.useFSCache = true;
+  '';
   startScript = pkgs.writeShellScript "agentmemory-start" ''
     set -eu
     ${lib.optionalString cfg.llm.enable ''
-      for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
-        if [ -r ${config.sops.secrets.cliproxyapi-key.path} ]; then
-          export OPENAI_API_KEY="$(${pkgs.coreutils}/bin/cat ${config.sops.secrets.cliproxyapi-key.path})"
-          break
-        fi
-        sleep 1
-      done
-      if [ -z "''${OPENAI_API_KEY:-}" ]; then
-        echo "cliproxyapi-key was not readable after 30s" >&2
-        exit 1
-      fi
+      # OMP's auth gateway is loopback-only and runs with --no-auth. Agent Memory
+      # still needs a non-empty OpenAI-compatible key to select its LLM path, so
+      # use a local sentinel instead of depending on the unreliable LAN CLIProxyAPI
+      # secret route.
+      export OPENAI_API_KEY=local-auth-gateway
     ''}
     exec ${lib.getExe cfg.package.passthru.iii-engine} --config ${iiiConfig}
   '';
@@ -86,7 +90,13 @@ let
       }
       {
         name = "iii-cron";
-        config.adapter.name = "kv";
+        config.adapter = {
+          name = "kv";
+          config = {
+            store_method = "file_based";
+            file_path = "${dataDir}/cron_store.db";
+          };
+        };
       }
       {
         name = "iii-stream";
@@ -141,15 +151,17 @@ in
     package = lib.mkPackageOption pkgs "agentmemory" { };
 
     llm = {
-      enable = lib.mkEnableOption "Agent Memory LLM enrichment through the LAN OpenAI-compatible CLIProxyAPI";
+      enable = lib.mkEnableOption "Agent Memory LLM enrichment through the local OMP OpenAI-compatible auth gateway";
 
       baseUrl = lib.mkOption {
         type = lib.types.str;
-        default = "http://10.0.0.102:8317";
+        default = "http://127.0.0.1:4000";
         description = ''
           Root URL for Agent Memory's OpenAI-compatible provider. Agent Memory
           0.9.21 appends /v1/chat/completions itself, so this must not include
-          /v1.
+          /v1. Use the local OMP auth gateway root instead of the old LAN
+          CLIProxyAPI route so compression does not depend on cross-host
+          networking after rebuilds.
         '';
       };
 
@@ -237,7 +249,11 @@ in
 
       systemd.services.agentmemory = {
         description = "Agent Memory parallel observer";
-        after = [ "network.target" ];
+        after = [
+          "network.target"
+          "omp-auth-gateway.service"
+        ];
+        wants = [ "omp-auth-gateway.service" ];
         wantedBy = [ "multi-user.target" ];
 
         environment = {
@@ -257,6 +273,9 @@ in
           III_VIEWER_PORT = toString viewerPort;
           III_ENGINE_URL = "ws://127.0.0.1:${toString enginePort}";
           VIEWER_ALLOWED_ORIGINS = "http://127.0.0.1:${toString restPort},http://127.0.0.1:${toString viewerPort},http://localhost:${toString restPort},http://localhost:${toString viewerPort}";
+          TRANSFORMERS_CACHE = transformersCacheDir;
+          XDG_CACHE_HOME = cacheDir;
+          NODE_OPTIONS = "--import ${transformersRuntimeConfig}";
         }
         // lib.optionalAttrs cfg.llm.enable {
           OPENAI_BASE_URL = cfg.llm.baseUrl;
@@ -280,6 +299,7 @@ in
           iiiConfig
           readyCheck
           startScript
+          transformersRuntimeConfig
           cfg.package
         ];
 
@@ -292,9 +312,19 @@ in
             "agentmemory/data"
           ];
           StateDirectoryMode = "0700";
+          CacheDirectory = [
+            "agentmemory"
+            "agentmemory/transformers"
+          ];
+          CacheDirectoryMode = "0700";
           WorkingDirectory = stateDir;
           ExecStart = startScript;
           ExecStartPost = readyCheck;
+          # iii/Node workers can leave cgroup children behind after the main
+          # engine exits. Do not let rebuild/test wait systemd's default 90s
+          # stop timeout for a memory observer; SIGKILL cleanup is acceptable
+          # after a short graceful drain.
+          TimeoutStopSec = "10s";
           Restart = "on-failure";
           RestartSec = "5s";
 
@@ -302,7 +332,10 @@ in
           PrivateTmp = true;
           ProtectSystem = "strict";
           ProtectHome = true;
-          ReadWritePaths = [ stateDir ];
+          ReadWritePaths = [
+            stateDir
+            cacheDir
+          ];
           RestrictAddressFamilies = [
             "AF_UNIX"
             "AF_INET"
