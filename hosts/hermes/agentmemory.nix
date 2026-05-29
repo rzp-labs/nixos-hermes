@@ -20,6 +20,8 @@ let
   yaml = pkgs.formats.yaml { };
   agentmemoryRoot = "${cfg.package}/lib/node_modules/@agentmemory/agentmemory";
   transformersRuntimeConfig = pkgs.writeText "agentmemory-transformers-runtime.mjs" ''
+    // Import the package's ESM main file so this mutates the same env object
+    // used by Agent Memory's later @xenova/transformers pipeline imports.
     import { env } from "${agentmemoryRoot}/node_modules/@xenova/transformers/src/transformers.js";
 
     env.cacheDir = process.env.TRANSFORMERS_CACHE || "${transformersCacheDir}";
