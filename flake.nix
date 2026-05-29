@@ -475,6 +475,8 @@
               grep -q -- 'arbitrary journalctl arguments are not allowed' '${netdataObservePackage}/bin/netdata-observe'
               grep -q -- 'netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service' '${netdataObservePackage}/bin/netdata-observe'
               grep -q -- '--output=short-iso' '${netdataObservePackage}/bin/netdata-observe'
+              grep -q -- '10#$lines' '${netdataObservePackage}/bin/netdata-observe'
+              '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 08 >/dev/null
               ! '${netdataObservePackage}/bin/netdata-observe' logs sshd.service 10 2>/dev/null
               ! '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 501 2>/dev/null
               ! '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 10 --since=-1h 2>/dev/null

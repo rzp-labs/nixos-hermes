@@ -278,12 +278,15 @@ let
             echo "Error: lines must be an integer between 1 and 500." >&2
             exit 2
           fi
-          if (( lines < 1 || lines > 500 )); then
+          # Bash arithmetic and journalctl both reject leading-zero values such as 08.
+          # Normalize through explicit base 10 so otherwise-valid decimal input is safe.
+          lines_decimal=$((10#$lines))
+          if (( lines_decimal < 1 || lines_decimal > 500 )); then
             echo "Error: lines must be between 1 and 500." >&2
             exit 2
           fi
 
-          journalctl -u "$unit" -n "$lines" --no-pager --output=short-iso
+          journalctl -u "$unit" -n "$lines_decimal" --no-pager --output=short-iso
           ;;
         -h|--help|help)
           usage
