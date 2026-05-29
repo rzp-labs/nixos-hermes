@@ -84,10 +84,14 @@ The initial adapter intentionally does not build derivations or require secrets.
 It proves the evaluated surface it asks for; it does not claim global truth for
 outputs or Nix expressions outside that surface.
 
-## Nix static-analysis fallback
+`repowise-nix dead-code` fails hard when native Nix reachability cannot be
+collected for a flake. Static Nix parsing is not an acceptable reachability
+fallback; fix the Nix evaluation surface instead of accepting heuristic proof.
+
+## Nix static parsing scope
 
 The packaged `repowise` also includes a source-level Nix support patch. It is
-static-only: it never runs `nix` during graph/dead-code analysis.
+static-only and exists for symbols/orientation, not proof of reachability.
 
 Supported reachability patterns include module import lists, direct `import ./file.nix`, `callPackage` path arguments, directory fallbacks (`foo.nix`, `foo/default.nix`, `foo/flake.nix`), selected `evalModule`/treefmt-style path arguments, and local `path:./...` flake inputs. Dynamic expressions degrade conservatively instead of becoming high-confidence deletion advice.
 

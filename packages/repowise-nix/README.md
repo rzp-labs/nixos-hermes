@@ -73,14 +73,17 @@ REPOWISE_REPO=/path/to/flake \
 
 The output uses proof-typed edges such as `nix_eval_output_position`,
 `nix_eval_flake_input`, `nix_eval_module`, and
-`nix_eval_option_definition`. Repowise graph/dead-code integration should treat
-those as stronger evidence than static tree-sitter path extraction.
+`nix_eval_option_definition`. `repowise-nix dead-code` refuses to use static
+Nix heuristics as a reachability fallback for flakes: if native evaluation
+fails, the command fails hard and asks for the Nix evaluation problem to be
+fixed.
 
-## Static Nix analysis patterns
+## Static Nix parsing scope
 
-The local Repowise patch also contains static fallback support. Static analysis
-does not run `nix` and does not try to evaluate arbitrary expressions.
-Supported Nix reachability patterns are intentionally boring:
+The local Repowise patch also contains static Nix parsing support for symbols
+and low-confidence orientation. Static parsing does not run `nix`, does not try
+to evaluate arbitrary expressions, and must not be used as proof that Nix files
+are reachable. Supported syntax patterns are intentionally boring:
 
 - `imports = [ ./module.nix ../other.nix ];`
 - `import ./file.nix`
@@ -89,7 +92,9 @@ Supported Nix reachability patterns are intentionally boring:
 - selected `evalModule` / `.lib.evalModule` path arguments such as `treefmt-nix.lib.evalModule pkgs ./treefmt.nix`
 - local flake input URLs like `url = "path:./packages/tool"`, preferring nested `flake.nix`
 
-Unsupported dynamic expressions degrade conservatively: they should not create high-confidence deletion recommendations just because static parsing cannot prove the edge.
+Unsupported dynamic expressions degrade conservatively: they should not create
+high-confidence deletion recommendations just because static parsing cannot
+prove the edge.
 
 Patch organization stays source-level and rebaseable: `repowise-nix-language-support.patch` carries Nix parsing/resolver/dead-code behavior plus tests; `repowise-status-stale-schema-warning.patch` only carries stale local-index UX. No generated/minified/dist surgery is part of the durable patch path.
 

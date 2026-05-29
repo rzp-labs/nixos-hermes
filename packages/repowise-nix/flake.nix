@@ -71,8 +71,10 @@
                 grep -q -- 'repowise reindex --embedder' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- '"\$@" .' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'repowise search "\$@" .' '${repowise-nix}/bin/repowise-nix'
+                grep -q -- 'native-dead-code.py' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'nix-reachability' '${repowise-nix}/bin/repowise-nix'
 
+                grep -q -- 'Fix the Nix evaluation error below' '${./native-dead-code.py}'
                 grep -q -- 'nix_eval_output_position' '${./nix-reachability.py}'
                 grep -q -- 'nix_eval_flake_input' '${./nix-reachability.py}'
                 grep -q -- 'nix_eval_option_definition' '${./nix-reachability.py}'
