@@ -107,6 +107,11 @@
         }
       );
 
+      # Checks split across files (see AGENTS.md → "What Each Nix File Owns"):
+      #   - pre-commit-check       ./checks/pre-commit.nix (all dev systems)
+      #   - VM tests               ./tests           (x86_64-linux only)
+      #   - eval-assertion checks  ./tests/eval      (x86_64-linux only)
+      # Run with: nix build .#checks.x86_64-linux.<name>
       checks = forDevSystems (
         system:
         let
@@ -114,465 +119,37 @@
           vmTests = pkgs.callPackage ./tests {
             inherit nixpkgs sops-nix hermes-agent;
           };
+          evalChecks = import ./tests/eval {
+            inherit pkgs;
+            hostSystem = self.nixosConfigurations.nixos-hermes;
+          };
         in
         {
-          pre-commit-check = git-hooks.lib.${system}.run {
-            src = ./.;
-            hooks = {
-              # Nix formatting
-              nixfmt-rfc-style.enable = true;
-
-              # Secret scanning — knows 150+ patterns
-              gitleaks = {
-                enable = true;
-                name = "gitleaks";
-                entry = "${pkgs.gitleaks}/bin/gitleaks protect --staged --no-banner --config .gitleaks.toml";
-                language = "system";
-                pass_filenames = false;
-                stages = [ "pre-commit" ];
-              };
-
-              # Catches bash pitfalls (set -u, unquoted globs, etc.) if shell scripts are added
-              shellcheck.enable = true;
-
-              # YAML validation — inline config to handle dotfile exclusion in nix sandbox
-              yamllint = {
-                enable = true;
-                settings.configuration = ''
-                  extends: default
-                  rules:
-                    document-start: disable
-                    truthy: disable
-                    line-length:
-                      max: 120
-                      allow-non-breakable-words: true
-                      level: warning
-                  ignore: |
-                    hosts/hermes/secrets/
-                    tests/assets/
-                '';
-              };
-
-              # GitHub Actions linting
-              actionlint.enable = true;
-
-              # Typo detection across all text files
-              typos.enable = true;
-
-              # General hygiene
-              end-of-file-fixer.enable = true;
-              trim-trailing-whitespace.enable = true;
-              check-yaml.enable = true;
-              check-added-large-files.enable = true;
-            };
+          pre-commit-check = import ./checks/pre-commit.nix {
+            inherit pkgs git-hooks system;
           };
         }
-        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          # VM tests — QEMU only available on Linux.
-          # Run with: nix build .#checks.x86_64-linux.<name>
-          # See AGENTS.md for the testing ladder — use VM tests only for
-          # activation script changes.
-          inherit (vmTests)
-            activation-github-auth
-            vm-switch-smoke
-            ;
-
-          hermes-runtime-packaging =
-            let
-              hostConfig = self.nixosConfigurations.nixos-hermes.config;
-              hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
-              hermesCfg = hostConfig.services.hermes-agent;
-              hermesPackage = hermesCfg.package.override {
-                inherit (hermesCfg) extraDependencyGroups extraPythonPackages;
-              };
-            in
-            pkgs.runCommand "hermes-runtime-packaging" { } ''
-                            set -eu
-                            test '${hermesPackage.version}' = '0.15.0'
-                            PYTHONPATH='${hostPkgs.opusCtypesShim}' '${hermesPackage.passthru.hermesVenv}/bin/python3' - <<'PY'
-              import ctypes.util
-              import importlib.util
-
-              missing = [
-                  name
-                  for name in ["hermes_cli.proxy", "discord", "gateway", "hermes_cli.gateway"]
-                  if importlib.util.find_spec(name) is None
-              ]
-              if missing:
-                  raise SystemExit(f"missing runtime imports: {missing}")
-              opus = ctypes.util.find_library("opus")
-              if not opus or "libopus.so" not in opus:
-                  raise SystemExit(f"opus shim did not resolve libopus: {opus!r}")
-              PY
-                            touch $out
-            '';
-
-          repowise-nix-tooling =
-            let
-              hostConfig = self.nixosConfigurations.nixos-hermes.config;
-              hostPkgs = self.nixosConfigurations.nixos-hermes.pkgs;
-              hermesExtraPackages = builtins.concatStringsSep "\n" (
-                map toString hostConfig.services.hermes-agent.extraPackages
-              );
-              systemPackages = builtins.concatStringsSep "\n" (
-                map toString hostConfig.environment.systemPackages
-              );
-              adminHome = hostConfig.home-manager.users.admin;
-              adminHomePackages = builtins.concatStringsSep "\n" (map toString adminHome.home.packages);
-              adminHomeSessionPath = builtins.concatStringsSep "\n" adminHome.home.sessionPath;
-              adminBashInit = adminHome.programs.bash.initExtra;
-            in
-            pkgs.runCommand "repowise-nix-tooling" { } ''
-              set -eu
-              test '${hostPkgs.repowise.version}' = '0.10.0-repowise-nix'
-              test -x '${hostPkgs.repowise}/bin/repowise'
-              test '${hostPkgs.vite-plus.version}' = '0.1.22'
-              test -x '${hostPkgs.vite-plus}/bin/vp'
-              test -x '${hostPkgs.vite-plus}/bin/vpx'
-              test -x '${hostPkgs.vite-plus}/bin/vpr'
-              '${hostPkgs.vite-plus}/bin/vp' --help >/dev/null
-              '${hostPkgs.vite-plus}/bin/vpx' --help >/dev/null
-              '${hostPkgs.vite-plus}/bin/vpr' --help >/dev/null
-              '${hostPkgs.vite-plus}/bin/vp' env --help >/dev/null
-              vp_home="$PWD/vp-home"
-              mkdir -p "$vp_home/.vite-plus/bin"
-              for tool in vp node npm npx vpx vpr; do
-                ln -s ../current/bin/vp "$vp_home/.vite-plus/bin/$tool"
-              done
-              setup_output=$(HOME="$vp_home" PATH="${hostPkgs.vite-plus}/bin:${hostPkgs.nodejs}/bin:$PATH" '${hostPkgs.vite-plus}/bin/vp' env setup --refresh 2>&1)
-              ! printf '%s\n' "$setup_output" | grep -q 'File exists (os error 17)'
-              for tool in vp node npm npx vpx vpr; do
-                test "$(readlink "$vp_home/.vite-plus/bin/$tool")" = '${hostPkgs.vite-plus}/bin/vp'
-              done
-              test '${hostPkgs.llm-agents.cli-proxy-api.version}' = '7.1.20'
-              test -x '${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api'
-              ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.20'
-              test -f '${./packages/repowise-nix/flake.nix}'
-              test -f '${./packages/repowise-nix/patches/repowise-nix-language-support.patch}'
-              grep -q -- 'inputs.repowise-nix.packages' '${./modules/packages.nix}'
-              test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${hostPkgs.repowise}/${hostPkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
-              grep -q -- 'unset PYTHONPATH' '${hostPkgs.repowise}/bin/repowise'
-              '${hostPkgs.repowise}/bin/repowise' --help >/dev/null
-              mkdir repo
-              REPOWISE_REPO="$PWD/repo" '${hostPkgs.repowise-nix}/bin/repowise-nix' --help >/dev/null
-              grep -q -- 'unset PYTHONPATH' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- '.repowise/\*\*' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'REPOWISE_EXTRA_EXCLUDES' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'REPOWISE_OPENAI_API_KEY' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'REPOWISE_OPENAI_BASE_URL' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'OPENAI_API_KEY="$REPOWISE_OPENAI_API_KEY"' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'OPENAI_BASE_URL="$REPOWISE_OPENAI_BASE_URL"' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'REPOWISE_EDITOR_SETUP' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- '--no-claude-md' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP=1' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- "repowise-nix: REPOWISE_REPO='\$repo' does not exist" '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'read -r -a extra_excludes_arr' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'repowise reindex --embedder' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- '"\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- 'repowise search "\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              if REPOWISE_REPO="$PWD/missing" '${hostPkgs.repowise-nix}/bin/repowise-nix' status 2>err; then
-                echo 'expected missing REPOWISE_REPO to fail' >&2
-                exit 1
-              fi
-              grep -q -- "repowise-nix: REPOWISE_REPO='$PWD/missing' does not exist" err
-              grep -q -- 'generate|refresh' '${hostPkgs.repowise-nix}/bin/repowise-nix'
-              grep -q -- '${hostPkgs.repowise}' <<'EOF'
-              ${hermesExtraPackages}
-              EOF
-              grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
-              ${hermesExtraPackages}
-              EOF
-              grep -q -- '${hostPkgs.llm-agents.cli-proxy-api}' <<'EOF'
-              ${systemPackages}
-              EOF
-              grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
-              ${adminHomePackages}
-              EOF
-              grep -q -- '${hostPkgs.nodejs}' <<'EOF'
-              ${adminHomePackages}
-              EOF
-              grep -q -- '${hostPkgs.llm-agents.omp}' <<'EOF'
-              ${adminHomePackages}
-              EOF
-              grep -q -- '.vite-plus/bin' <<'EOF'
-              ${adminHomeSessionPath}
-              EOF
-              grep -q -- '.vite-plus/env' <<'EOF'
-              ${adminBashInit}
-              EOF
-              ! grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
-              ${systemPackages}
-              EOF
-              ! grep -q -- '${hostPkgs.nodejs}' <<'EOF'
-              ${systemPackages}
-              EOF
-              grep -q -- '${hostPkgs.repowise}' <<'EOF'
-              ${systemPackages}
-              EOF
-              grep -q -- '${hostPkgs.repowise-nix}' <<'EOF'
-              ${systemPackages}
-              EOF
-              touch $out
-            '';
-
-          agentmemory-service-config =
-            let
-              hostConfig = self.nixosConfigurations.nixos-hermes.config;
-              unit = hostConfig.systemd.services.agentmemory;
-              env = unit.environment;
-              service = unit.serviceConfig;
-              stateDirectories = pkgs.lib.toList service.StateDirectory;
-              cacheDirectories = pkgs.lib.toList service.CacheDirectory;
-              hermesMcp = hostConfig.services.hermes-agent.mcpServers.agentmemory;
-              hermesPluginNames = builtins.concatStringsSep "\n" (
-                map toString hostConfig.services.hermes-agent.extraPlugins
-              );
-              hermesEnabledPlugins = builtins.concatStringsSep " " hostConfig.services.hermes-agent.settings.plugins.enabled;
-            in
-            pkgs.runCommand "agentmemory-service-config" { } ''
-              set -eu
-              test '${if hostConfig.services.agentmemory.enable then "true" else "false"}' = 'true'
-              test '${if hostConfig.services.agentmemory.llm.enable then "true" else "false"}' = 'true'
-              test '${hostConfig.services.agentmemory.llm.baseUrl}' = 'http://127.0.0.1:4000'
-              test '${hostConfig.services.agentmemory.llm.model}' = 'gpt-5.4-mini'
-              test '${toString hostConfig.services.agentmemory.llm.timeoutMs}' = '120000'
-              test '${hostConfig.services.agentmemory.llm.embeddingProvider}' = 'local'
-              test '${hostConfig.services.agentmemory.package.version}' = '0.9.21'
-              test -d '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory/node_modules/@xenova/transformers'
-              test -f '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory/node_modules/sharp/build/Release/sharp-linux-x64.node'
-              (cd '${hostConfig.services.agentmemory.package}/lib/node_modules/@agentmemory/agentmemory' && ${pkgs.nodejs}/bin/node --input-type=module -e 'import("@xenova/transformers").then((m) => { if (typeof m.pipeline !== "function") process.exit(1); }).catch((err) => { console.error(err); process.exit(1); })')
-              test '${hostConfig.services.agentmemory.package.passthru.iii-engine.version}' = '0.11.2'
-              test '${env.HOME}' = '/var/lib/agentmemory'
-              test '${env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
-              test '${env.AGENTMEMORY_VIEWER_URL}' = 'http://127.0.0.1:3113'
-              test '${env.AGENTMEMORY_ALLOW_AGENT_SDK}' = 'false'
-              test '${env.AGENTMEMORY_AUTO_COMPRESS}' = 'true'
-              test '${env.GRAPH_EXTRACTION_ENABLED}' = 'true'
-              test '${env.CONSOLIDATION_ENABLED}' = 'true'
-              test '${env.AGENTMEMORY_INJECT_CONTEXT}' = 'true'
-              test '${env.AGENTMEMORY_TOOLS}' = 'core'
-              test '${env.OPENAI_BASE_URL}' = 'http://127.0.0.1:4000'
-              test '${env.OPENAI_MODEL}' = 'gpt-5.4-mini'
-              test '${env.AGENTMEMORY_LLM_TIMEOUT_MS}' = '120000'
-              test '${env.OPENAI_TIMEOUT_MS}' = '120000'
-              test '${env.EMBEDDING_PROVIDER}' = 'local'
-              test '${env.TRANSFORMERS_CACHE}' = '/var/cache/agentmemory/transformers'
-              test '${env.XDG_CACHE_HOME}' = '/var/cache/agentmemory'
-              grep -q -- 'agentmemory-transformers-runtime.mjs' <<'EOF'
-              ${env.NODE_OPTIONS}
-              EOF
-              test '${if builtins.hasAttr "OPENAI_API_KEY" env then "true" else "false"}' = 'false'
-              test '${env.III_REST_PORT}' = '3111'
-              test '${env.III_STREAMS_PORT}' = '3112'
-              test '${env.III_STREAM_PORT}' = '3112'
-              test '${env.III_VIEWER_PORT}' = '3113'
-              test '${env.III_ENGINE_URL}' = 'ws://127.0.0.1:49134'
-              test '${service.User}' = 'agentmemory'
-              test '${service.Group}' = 'agentmemory'
-
-              test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
-              test '${builtins.concatStringsSep " " cacheDirectories}' = 'agentmemory agentmemory/transformers'
-              test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
-              test '${service.TimeoutStopSec}' = '10s'
-              test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
-              test '${builtins.concatStringsSep " " hermesMcp.args}' = 'mcp'
-              test '${hermesMcp.env.AGENTMEMORY_URL}' = 'http://127.0.0.1:3111'
-              agentmemory_plugin_path=$(grep -- 'agentmemory-hermes-plugin-0.9.21' <<'EOF' | head -n 1
-              ${hermesPluginNames}
-              EOF
-              )
-              test -n "$agentmemory_plugin_path"
-              for hook in prefetch sync_turn on_session_end on_pre_compress on_memory_write system_prompt_block; do
-                grep -q -- "- $hook" "$agentmemory_plugin_path/plugin.yaml"
-              done
-              grep -qw -- 'agentmemory' <<'EOF'
-              ${hermesEnabledPlugins}
-              EOF
-              test '${hostConfig.services.hermes-agent.settings.memory.provider}' = 'nix-managed-agentmemory-hermes-plugin'
-              test '${service.ProtectSystem}' = 'strict'
-              test '${if service.ProtectHome then "true" else "false"}' = 'true'
-              grep -q -- '/bin/iii --config ' '${service.ExecStart}'
-              grep -q -- 'export OPENAI_API_KEY=' '${service.ExecStart}'
-              grep -q -- 'export OPENAI_API_KEY=local-auth-gateway' '${service.ExecStart}'
-              test '${if builtins.hasAttr "ExecStartPre" service then "true" else "false"}' = 'false'
-              grep -q -- '${pkgs.bash}/bin' <<'EOF'
-              ${env.PATH}
-              EOF
-              grep -q -- '${hostConfig.services.agentmemory.package.passthru.iii-engine}/bin' <<'EOF'
-              ${env.PATH}
-              EOF
-              grep -q -- 'agentmemory-iii-config.yaml' <<'EOF'
-              ${builtins.readFile service.ExecStart}
-              EOF
-              grep -q -- 'cron_store.db' '${builtins.head unit.restartTriggers}'
-              grep -q -- 'state_store.db' '${builtins.head unit.restartTriggers}'
-              grep -q -- 'stream_store' '${builtins.head unit.restartTriggers}'
-              if grep -qi -- 'in_memory' '${builtins.head unit.restartTriggers}'; then
-                echo 'agentmemory iii config must not use in_memory stores' >&2
-                exit 1
-              fi
-              grep -q -- 'agentmemory-ready-check' <<'EOF'
-              ${toString service.ExecStartPost}
-              EOF
-              grep -q -- '${pkgs.curl}/bin' <<'EOF'
-              ${env.PATH}
-              EOF
-              case '${service.ExecStart}' in
-                *'/bin/agentmemory --tools core'*)
-                  echo 'agentmemory.service must supervise iii-engine directly, not the daemonizing CLI wrapper' >&2
-                  exit 1
-                  ;;
-              esac
-              touch $out
-            '';
-
-          netdata-service-config =
-            let
-              hostConfig = self.nixosConfigurations.nixos-hermes.config;
-              netdataCfg = hostConfig.services.netdata;
-              netdataUnit = hostConfig.systemd.services.netdata;
-              hermesSupplementaryGroups = pkgs.lib.toList hostConfig.systemd.services.hermes-agent.serviceConfig.SupplementaryGroups;
-              hermesUserGroups = pkgs.lib.toList hostConfig.users.users.hermes.extraGroups;
-              netdataObservePackage = builtins.head (
-                builtins.filter (
-                  pkg: pkgs.lib.getName pkg == "netdata-observe"
-                ) hostConfig.environment.systemPackages
-              );
-              systemPackages = builtins.map (pkg: pkgs.lib.getName pkg) hostConfig.environment.systemPackages;
-              netdataLoadCredentials = pkgs.lib.toList netdataUnit.serviceConfig.LoadCredential;
-              netdataExecStartPost = pkgs.lib.toList netdataUnit.serviceConfig.ExecStartPost;
-              netdataSupplementaryGroups = pkgs.lib.toList netdataUnit.serviceConfig.SupplementaryGroups;
-              hermesNetdataMcp = hostConfig.services.hermes-agent.mcpServers.netdata;
-              serviceNames = builtins.attrNames hostConfig.systemd.services;
-              netdataConfigDirNames = builtins.attrNames netdataCfg.configDir;
-            in
-            pkgs.runCommand "netdata-service-config" { } ''
-              set -eu
-              test '${if netdataCfg.enable then "true" else "false"}' = 'true'
-              test '${netdataCfg.package.version}' = '2.10.3'
-              test '${if netdataCfg.enableAnalyticsReporting then "true" else "false"}' = 'false'
-              test '${netdataCfg.config.web."bind to"}' = '127.0.0.1'
-              test '${netdataCfg.config.plugins.freeipmi}' = 'no'
-              test '${netdataCfg.config.plugins."logs-management"}' = 'no'
-              test '${toString (builtins.elem "systemd-journal" netdataSupplementaryGroups)}' = '1'
-              test '${hostConfig.sops.secrets.netdata-claim-conf.sopsFile}' = '${./hosts/hermes/secrets/netdata-claim.conf}'
-              test '${toString (builtins.elem "netdata_claim_conf:${hostConfig.sops.secrets.netdata-claim-conf.path}" netdataLoadCredentials)}' = '1'
-              grep -q -- 'netdata-install-cloud-claim-conf' <<'EOF'
-              ${builtins.toString netdataUnit.serviceConfig.ExecStartPre}
-              EOF
-              grep -q -- 'netdata-cloud-claim' <<'EOF'
-              ${builtins.toString netdataExecStartPost}
-              EOF
-              test '${toString (builtins.elem "netdata-observe" systemPackages)}' = '1'
-              grep -q -- '/bin/nd-mcp-bridge' <<'EOF'
-              ${hermesNetdataMcp.command}
-              EOF
-              test '${builtins.concatStringsSep " " hermesNetdataMcp.args}' = 'ws://127.0.0.1:19999/mcp'
-              test '${toString (builtins.elem "systemd-journal" hermesSupplementaryGroups)}' = '1'
-              test '${toString (builtins.elem "systemd-journal" hermesUserGroups)}' = '1'
-              '${netdataObservePackage}/bin/netdata-observe' --help | grep -q -- 'logs \[unit\] \[lines\]'
-              grep -q -- 'arbitrary journalctl arguments are not allowed' '${netdataObservePackage}/bin/netdata-observe'
-              grep -q -- 'netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service' '${netdataObservePackage}/bin/netdata-observe'
-              grep -q -- '--output=short-iso' '${netdataObservePackage}/bin/netdata-observe'
-              grep -q -- '10#$lines' '${netdataObservePackage}/bin/netdata-observe'
-              '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 08 >/dev/null
-              ! '${netdataObservePackage}/bin/netdata-observe' logs sshd.service 10 2>/dev/null
-              ! '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 501 2>/dev/null
-              ! '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 10 --since=-1h 2>/dev/null
-              test -d '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d'
-              test -f '${hostConfig.environment.etc."netdata/conf.d".source}/scripts.d/nagios.conf'
-              test '${if hostConfig.services.postgresql.enable then "true" else "false"}' = 'false'
-              test '${
-                if builtins.elem "go.d/postgres.conf" netdataConfigDirNames then "true" else "false"
-              }' = 'false'
-              test '${
-                if builtins.elem "netdata-postgres-monitoring-setup" serviceNames then "true" else "false"
-              }' = 'false'
-              grep -q -- '127.0.0.1' '${hostConfig.environment.etc."netdata/netdata.conf".source}'
-              grep -q -- '-D -c /etc/netdata/netdata.conf' <<'EOF'
-              ${netdataUnit.serviceConfig.ExecStart}
-              EOF
-              touch $out
-            '';
-
-          hindsight-service-config =
-            let
-              hostConfig = self.nixosConfigurations.nixos-hermes.config;
-              serviceNames = builtins.attrNames hostConfig.systemd.services;
-              hermesMemory = hostConfig.services.hermes-agent.settings.memory;
-              hermesEnvNames = builtins.attrNames hostConfig.services.hermes-agent.environment;
-              hermesAfter = hostConfig.systemd.services.hermes-agent.after;
-              hermesWants = hostConfig.systemd.services.hermes-agent.wants;
-            in
-            pkgs.runCommand "hindsight-service-config" { } ''
-              set -eu
-              test '${if hostConfig.services.hindsightMemory.enable then "true" else "false"}' = 'false'
-              test '${hermesMemory.provider}' = 'nix-managed-agentmemory-hermes-plugin'
-              test '${if builtins.elem "hindsight-embed" serviceNames then "true" else "false"}' = 'false'
-              test '${if builtins.elem "hindsight-postgres-init" serviceNames then "true" else "false"}' = 'false'
-              test '${if builtins.elem "llama-server" serviceNames then "true" else "false"}' = 'false'
-              test '${if builtins.elem "hindsight-embed.service" hermesAfter then "true" else "false"}' = 'false'
-              test '${if builtins.elem "hindsight-embed.service" hermesWants then "true" else "false"}' = 'false'
-              test '${if builtins.elem "HINDSIGHT_MODE" hermesEnvNames then "true" else "false"}' = 'false'
-              test '${if builtins.elem "HINDSIGHT_API_URL" hermesEnvNames then "true" else "false"}' = 'false'
-              test '${if builtins.elem "HINDSIGHT_BANK_ID" hermesEnvNames then "true" else "false"}' = 'false'
-              touch $out
-            '';
-        }
+        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") (
+          {
+            # VM tests — QEMU only available on Linux.
+            # See AGENTS.md for the testing ladder — use VM tests only for
+            # activation script changes.
+            inherit (vmTests)
+              activation-github-auth
+              vm-switch-smoke
+              ;
+          }
+          // evalChecks
+        )
       );
 
-      # Install-time CLIs exposed as flake apps so they use the same lockfile
-      # pin as the NixOS modules. Invoke with:
-      #   nix run .#nixos-anywhere -- --flake .#nixos-hermes ...
-      #   nix run .#disko -- --mode disko hosts/hermes/disk-config.nix
+      # Install-time CLIs and operational smokes (see ./apps/default.nix).
       apps = forDevSystems (
         system:
-        let
+        import ./apps {
+          inherit (nixpkgs) lib;
+          inherit system nixos-anywhere disko;
           pkgs = nixpkgs.legacyPackages.${system};
-          prePrVerify = pkgs.writeShellApplication {
-            name = "pre-pr-verify";
-            runtimeInputs = [
-              pkgs.coreutils
-              pkgs.git
-              pkgs.nix
-              pkgs.nixos-rebuild
-            ];
-            text = ''
-              exec ${pkgs.bash}/bin/bash ${./tools/pre-pr-verify.sh} "$@"
-            '';
-          };
-          hindsightContinuitySmoke = pkgs.writeShellApplication {
-            name = "hindsight-continuity-smoke";
-            runtimeInputs = [
-              pkgs.coreutils
-              pkgs.python3
-              pkgs.systemd
-            ];
-            text = ''
-              exec ${pkgs.bash}/bin/bash ${./tools/hindsight-continuity-smoke.sh} "$@"
-            '';
-          };
-        in
-        {
-          nixos-anywhere = {
-            type = "app";
-            program = "${nixos-anywhere.packages.${system}.nixos-anywhere}/bin/nixos-anywhere";
-          };
-          disko = {
-            type = "app";
-            program = "${disko.packages.${system}.disko}/bin/disko";
-          };
-        }
-        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          pre-pr-verify = {
-            type = "app";
-            program = "${prePrVerify}/bin/pre-pr-verify";
-          };
-          hindsight-continuity-smoke = {
-            type = "app";
-            program = "${hindsightContinuitySmoke}/bin/hindsight-continuity-smoke";
-          };
         }
       );
     };
