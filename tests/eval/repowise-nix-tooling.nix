@@ -70,6 +70,12 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   grep -q -- 'repowise reindex --embedder' '${hostPkgs.repowise-nix}/bin/repowise-nix'
   grep -q -- '"\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
   grep -q -- 'repowise search "\$@" .' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+  grep -q -- 'nix_dead_code_cmd.py' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+  grep -q -- 'nix-reachability' '${hostPkgs.repowise-nix}/bin/repowise-nix'
+  grep -q -- 'Fix the Nix evaluation error below' '${../../packages/repowise-nix/nix_dead_code_cmd.py}'
+  grep -q -- 'nix_eval_output_position' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'nix_eval_flake_input' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'nix_eval_option_definition' '${../../packages/repowise-nix/nix-reachability.py}'
   if REPOWISE_REPO="$PWD/missing" '${hostPkgs.repowise-nix}/bin/repowise-nix' status 2>err; then
     echo 'expected missing REPOWISE_REPO to fail' >&2
     exit 1
