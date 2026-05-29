@@ -81,7 +81,10 @@ gateway. Update your SSH config when it changes.
 
 ```text
 nixos-hermes/
-├── flake.nix                          # Flake inputs/outputs, host definition
+├── flake.nix                          # Thin manifest: inputs/outputs, host definition, wiring
+├── checks/pre-commit.nix              # git-hooks.nix hook config (dev shell + pre-commit-check)
+├── apps/default.nix                   # flake apps: nixos-anywhere, disko, smoke wrappers
+├── tests/                             # VM tests (tests/default.nix) + eval checks (tests/eval/)
 ├── .github/workflows/flakehub-publish-rolling.yml  # CI: publish to FlakeHub on push to main
 ├── .sops.yaml                         # sops encryption rules (age keys)
 ├── .secrets/                          # gitignored — plaintext secrets (local only)

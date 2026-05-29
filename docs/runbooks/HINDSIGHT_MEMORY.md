@@ -21,7 +21,7 @@ This is promoted from spike to host infrastructure for the personal assistant ho
 - `hosts/hermes/hindsight-embed.nix` — PostgreSQL/Hindsight API service and writable venv setup.
 - `modules/packages.nix` — `opusCtypesShim`, the CPython `ctypes.util.find_library("opus")` workaround consumed through `PYTHONPATH`.
 - `modules/hermes-plugins.nix` — packaged Hermes runtime Python extras, including `hindsight-client` for agent-facing memory tools.
-- `flake.nix` — `checks.x86_64-linux.hindsight-service-config` regression check.
+- `tests/eval/hindsight-service-config.nix` — `checks.x86_64-linux.hindsight-service-config` regression check.
 
 ## Model file placement
 
