@@ -197,6 +197,13 @@ runner and permits builds during `nix flake check` so import-from-derivation
 helpers are realized in the cold CI store. A green check proves the flake
 evaluates, repo-owned checks build, and generated configuration invariants pass.
 
+Contributor-facing flake outputs support both `x86_64-linux` and
+`aarch64-darwin`. Keep platform-specific outputs explicit: Linux-only checks,
+apps, imports, and wrapper derivations should be defined inside their
+`x86_64-linux` guard, not in an outer `let` that relies on Nix laziness to avoid
+Darwin evaluation. This keeps cross-platform intent obvious to reviewers and bot
+checks.
+
 It is not deployment proof. The production host uses the Determinate NixOS image
 and has real hardware, secrets, mutable service state, and activation behavior
 that GitHub's Ubuntu runner cannot exercise. Changes that touch activation,

@@ -181,6 +181,12 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
   dedicated files that `flake.nix` imports — see `tests/eval/`, `checks/`, and
   `apps/` below. When adding an output, add a file and wire it here; do not inline
   large attrsets back into `flake.nix`.
+- Make platform boundaries explicit at the import/derivation-definition site, not
+  only at the final attribute merge. If an output is Linux-only, put its
+  `callPackage`, `import`, or `writeShellApplication` binding inside the
+  `system == "x86_64-linux"` guard even when Nix laziness would avoid forcing it
+  on Darwin. This is readability policy: reviewers should see unsupported systems
+  are never asked to construct Linux-only values.
 
 *`nixosModules.default` convention*
 
@@ -250,6 +256,9 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
   smokes that wrap scripts under `../tools`. Invoked as `nix run .#<app>`.
 - Receives `{ pkgs, lib, system, nixos-anywhere, disko }` from `flake.nix`; the
   `x86_64-linux`-only apps are added via `lib.optionalAttrs`.
+- Keep Linux-only wrapper derivations inside the `x86_64-linux` attrset's local
+  `let`. Do not define them in the file-level `let` and rely on Nix laziness to
+  avoid Darwin evaluation.
 
 ### `hosts/hermes/default.nix`
 

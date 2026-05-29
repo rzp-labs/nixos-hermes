@@ -116,31 +116,36 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          vmTests = pkgs.callPackage ./tests {
-            inherit nixpkgs sops-nix hermes-agent;
-          };
-          evalChecks = import ./tests/eval {
-            inherit pkgs;
-            hostSystem = self.nixosConfigurations.nixos-hermes;
-          };
+          linuxChecks =
+            if system == "x86_64-linux" then
+              let
+                vmTests = pkgs.callPackage ./tests {
+                  inherit nixpkgs sops-nix hermes-agent;
+                };
+                evalChecks = import ./tests/eval {
+                  inherit pkgs;
+                  hostSystem = self.nixosConfigurations.nixos-hermes;
+                };
+              in
+              {
+                # VM tests — QEMU only available on Linux.
+                # See AGENTS.md for the testing ladder — use VM tests only for
+                # activation script changes.
+                inherit (vmTests)
+                  activation-github-auth
+                  vm-switch-smoke
+                  ;
+              }
+              // evalChecks
+            else
+              { };
         in
         {
           pre-commit-check = import ./checks/pre-commit.nix {
             inherit pkgs git-hooks system;
           };
         }
-        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") (
-          {
-            # VM tests — QEMU only available on Linux.
-            # See AGENTS.md for the testing ladder — use VM tests only for
-            # activation script changes.
-            inherit (vmTests)
-              activation-github-auth
-              vm-switch-smoke
-              ;
-          }
-          // evalChecks
-        )
+        // linuxChecks
       );
 
       # Install-time CLIs and operational smokes (see ./apps/default.nix).

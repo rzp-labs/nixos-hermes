@@ -12,31 +12,6 @@
   nixos-anywhere,
   disko,
 }:
-let
-  prePrVerify = pkgs.writeShellApplication {
-    name = "pre-pr-verify";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.git
-      pkgs.nix
-      pkgs.nixos-rebuild
-    ];
-    text = ''
-      exec ${pkgs.bash}/bin/bash ${../tools/pre-pr-verify.sh} "$@"
-    '';
-  };
-  hindsightContinuitySmoke = pkgs.writeShellApplication {
-    name = "hindsight-continuity-smoke";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.python3
-      pkgs.systemd
-    ];
-    text = ''
-      exec ${pkgs.bash}/bin/bash ${../tools/hindsight-continuity-smoke.sh} "$@"
-    '';
-  };
-in
 {
   nixos-anywhere = {
     type = "app";
@@ -47,13 +22,40 @@ in
     program = "${disko.packages.${system}.disko}/bin/disko";
   };
 }
-// lib.optionalAttrs (system == "x86_64-linux") {
-  pre-pr-verify = {
-    type = "app";
-    program = "${prePrVerify}/bin/pre-pr-verify";
-  };
-  hindsight-continuity-smoke = {
-    type = "app";
-    program = "${hindsightContinuitySmoke}/bin/hindsight-continuity-smoke";
-  };
-}
+// lib.optionalAttrs (system == "x86_64-linux") (
+  let
+    prePrVerify = pkgs.writeShellApplication {
+      name = "pre-pr-verify";
+      runtimeInputs = [
+        pkgs.coreutils
+        pkgs.git
+        pkgs.nix
+        pkgs.nixos-rebuild
+      ];
+      text = ''
+        exec ${pkgs.bash}/bin/bash ${../tools/pre-pr-verify.sh} "$@"
+      '';
+    };
+    hindsightContinuitySmoke = pkgs.writeShellApplication {
+      name = "hindsight-continuity-smoke";
+      runtimeInputs = [
+        pkgs.coreutils
+        pkgs.python3
+        pkgs.systemd
+      ];
+      text = ''
+        exec ${pkgs.bash}/bin/bash ${../tools/hindsight-continuity-smoke.sh} "$@"
+      '';
+    };
+  in
+  {
+    pre-pr-verify = {
+      type = "app";
+      program = "${prePrVerify}/bin/pre-pr-verify";
+    };
+    hindsight-continuity-smoke = {
+      type = "app";
+      program = "${hindsightContinuitySmoke}/bin/hindsight-continuity-smoke";
+    };
+  }
+)
