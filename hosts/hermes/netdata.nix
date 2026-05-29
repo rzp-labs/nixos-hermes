@@ -197,12 +197,12 @@ let
         allmetrics                   Dump all metrics as JSON
         data <chart> [seconds]       Fetch chart data, default window: 300s
         api <path>                   Call an arbitrary Netdata API path
-        logs [unit] [journal args]   Show systemd logs, default unit: netdata.service
+        logs [unit] [lines]          Show bounded systemd logs, default: netdata.service 120
 
       Examples:
         netdata-observe data system.cpu 600
         netdata-observe api /api/v1/data?chart=system.ram\&after=-300\&format=json
-        netdata-observe logs netdata.service -n 200 --no-pager
+        netdata-observe logs netdata.service 200
       EOF
       }
 
@@ -258,10 +258,35 @@ let
           ;;
         logs)
           unit="''${1:-netdata.service}"
-          if [[ $# -gt 0 ]]; then
-            shift
+          lines="''${2:-120}"
+
+          if [[ $# -gt 2 ]]; then
+            echo "Error: logs accepts only [unit] [lines]; arbitrary journalctl arguments are not allowed." >&2
+            exit 2
           fi
-          journalctl -u "$unit" "$@"
+
+          case "$unit" in
+            netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service)
+              ;;
+            *)
+              echo "Error: unit is not allowlisted for bounded log access: $unit" >&2
+              exit 2
+              ;;
+          esac
+
+          if ! [[ "$lines" =~ ^[0-9]+$ ]]; then
+            echo "Error: lines must be an integer between 1 and 500." >&2
+            exit 2
+          fi
+          # Bash arithmetic and journalctl both reject leading-zero values such as 08.
+          # Normalize through explicit base 10 so otherwise-valid decimal input is safe.
+          lines_decimal=$((10#$lines))
+          if (( lines_decimal < 1 || lines_decimal > 500 )); then
+            echo "Error: lines must be between 1 and 500." >&2
+            exit 2
+          fi
+
+          journalctl -u "$unit" -n "$lines_decimal" --no-pager --output=short-iso
           ;;
         -h|--help|help)
           usage
@@ -322,6 +347,11 @@ in
     command = lib.getExe netdataPackage.passthru.nd-mcp-bridge;
     args = [ "ws://127.0.0.1:19999/mcp" ];
   };
+
+  # Interactive Hermes/TUI tool calls do not inherit hermes-agent.service's
+  # SupplementaryGroups. Grant the login user raw journal read access, then keep
+  # agent-facing log retrieval bounded through netdata-observe's allowlist/line cap.
+  users.users.hermes.extraGroups = [ "systemd-journal" ];
 
   services.postgresql.ensureUsers = lib.mkIf config.services.postgresql.enable [
     {
