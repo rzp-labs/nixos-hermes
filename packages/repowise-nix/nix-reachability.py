@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -54,7 +55,7 @@ def _store_source_mapping(repo: Path, timeout: int) -> str:
 def _to_repo_relative(path: str | None, repo: Path, store_source: str) -> str | None:
     if not path:
         return None
-    cleaned = path.split(", via option", 1)[0]
+    cleaned = path.split(", via option", 1)[0].rsplit(":", 1)[0]
     cleaned_path = Path(cleaned)
     try:
         rel = cleaned_path.resolve().relative_to(repo.resolve()).as_posix()
@@ -112,6 +113,7 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
         posOrNull = name: set:
           let pos = builtins.unsafeGetAttrPos name set;
           in if pos == null then null else { file = pos.file; line = pos.line; column = pos.column; };
+        metaPosition = value: value.meta.position or null;
         collectSystem = attrName:
           if !(has flake.outputs attrName) then [] else
           builtins.concatLists (map (system:
@@ -119,6 +121,7 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
             builtins.map (name: {
               output = "${attrName}.${system}.${name}";
               position = posOrNull name flake.outputs.${attrName}.${system};
+              metaPosition = metaPosition flake.outputs.${attrName}.${system}.${name};
             }) (builtins.attrNames flake.outputs.${attrName}.${system})
           ) systems);
         formatter =
@@ -127,6 +130,7 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
             if !(has flake.outputs.formatter system) then [] else [{
               output = "formatter.${system}";
               position = posOrNull system flake.outputs.formatter;
+              metaPosition = metaPosition flake.outputs.formatter.${system};
             }]
           ) systems);
         nixos =
@@ -134,6 +138,7 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
           builtins.map (name: {
             output = "nixosConfigurations.${name}";
             position = posOrNull name flake.outputs.nixosConfigurations;
+            metaPosition = null;
           }) (builtins.attrNames flake.outputs.nixosConfigurations);
         inputPaths = builtins.mapAttrs (name: input: input.outPath or null) flake.inputs;
       in { outputs = (collectSystem "packages") ++ (collectSystem "checks") ++ (collectSystem "devShells") ++ (collectSystem "apps") ++ formatter ++ nixos; inputs = inputPaths; }
@@ -152,6 +157,8 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
                 candidate = str(path).split(marker, 1)[1].lstrip("/")
                 if candidate and (repo / candidate).exists():
                     rel = candidate
+            if rel is None:
+                rel = _to_repo_relative(str(path), repo, store_source)
         if rel is None:
             continue
         default_target = rel.rstrip("/") + "/flake.nix"
@@ -178,6 +185,15 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
             line=pos.get("line"),
             column=pos.get("column"),
         )
+        meta_rel = _to_repo_relative(item.get("metaPosition"), repo, store_source)
+        _add_edge(
+            edges,
+            seen,
+            item["output"],
+            meta_rel,
+            "nix_eval_derivation_position",
+            "derivation meta.position from evaluated flake output",
+        )
 
 
 def _collect_nixos_definitions(repo: Path, store_source: str, timeout: int, edges: list[dict[str, Any]], seen: set[tuple[str, str, str]], config: str) -> None:
@@ -185,15 +201,23 @@ def _collect_nixos_definitions(repo: Path, store_source: str, timeout: int, edge
       let
         flake = builtins.getFlake (toString ./.);
         cfg = flake.outputs.nixosConfigurations.{config};
-        optionSets = [
-          {{ name = "environment.systemPackages"; opt = cfg.options.environment.systemPackages; }}
-          {{ name = "services.hermes-agent.settings"; opt = cfg.options.services.hermes-agent.settings; }}
-          {{ name = "services.hermes-agent.extraPackages"; opt = cfg.options.services.hermes-agent.extraPackages; }}
-          {{ name = "services.hermes-agent.extraPythonPackages"; opt = cfg.options.services.hermes-agent.extraPythonPackages; }}
-          {{ name = "services.hermes-agent.extraPlugins"; opt = cfg.options.services.hermes-agent.extraPlugins; }}
-          {{ name = "virtualisation.docker.enable"; opt = cfg.options.virtualisation.docker.enable; }}
-          {{ name = "sops.secrets"; opt = cfg.options.sops.secrets; }}
+        optionByPath = path:
+          builtins.foldl'
+            (value: name: if value == null || !(builtins.isAttrs value) || !(builtins.hasAttr name value) then null else builtins.getAttr name value)
+            cfg.options
+            (builtins.split "\\." path);
+        optionNames = [
+          "environment.systemPackages"
+          "systemd.services"
+          "boot.loader.systemd-boot.enable"
+          "services.hermes-agent.settings"
+          "services.hermes-agent.extraPackages"
+          "services.hermes-agent.extraPythonPackages"
+          "services.hermes-agent.extraPlugins"
+          "virtualisation.docker.enable"
+          "sops.secrets"
         ];
+        optionSets = builtins.filter (x: x.opt != null) (map (name: {{ inherit name; opt = optionByPath name; }}) optionNames);
         defs = optName: opt: map (def: {{ option = optName; file = def.file; }}) (opt.definitionsWithLocations or []);
         modules = map (m: if builtins.isPath m then toString m else if builtins.isString m then m else null) cfg._module.args.modules;
       in {{ definitions = builtins.concatLists (map (x: defs x.name x.opt) optionSets); modules = modules; }}
@@ -215,6 +239,45 @@ def _collect_nixos_definitions(repo: Path, store_source: str, timeout: int, edge
         )
 
 
+def _collect_static_nix_path_edges(repo: Path, edges: list[dict[str, Any]], seen: set[tuple[str, str, str]]) -> None:
+    """Add conservative syntax-derived path edges for literal Nix paths."""
+    path_pattern = re.compile(r'(?<![\w$])(?:path:)?\./[-+._/A-Za-z0-9]+|(?<![\w$])\.\./[-+._/A-Za-z0-9]+')
+    repo_resolved = repo.resolve()
+    for source_path in repo.rglob("*.nix"):
+        source_parts = set(source_path.parts)
+        if ".git" in source_parts or ".repowise" in source_parts:
+            continue
+        source_rel = source_path.relative_to(repo).as_posix()
+        try:
+            text = source_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for match in path_pattern.finditer(text):
+            raw = match.group(0)
+            raw_path = raw.removeprefix("path:")
+            base = (source_path.parent / raw_path).resolve()
+            try:
+                base.relative_to(repo_resolved)
+            except Exception:
+                continue
+            if base.suffix == ".nix":
+                candidates = [base]
+            else:
+                candidates = [base.with_suffix(".nix"), base / "flake.nix", base / "default.nix"]
+            for candidate in candidates:
+                if candidate.exists():
+                    _add_edge(
+                        edges,
+                        seen,
+                        source_rel,
+                        candidate.relative_to(repo_resolved).as_posix(),
+                        "nix_static_literal_path",
+                        "literal Nix path reference from source text",
+                        literal=raw,
+                    )
+                    break
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Collect Nix evaluator reachability evidence as JSON")
     parser.add_argument("repo", nargs="?", default=os.environ.get("REPOWISE_REPO", "."))
@@ -230,6 +293,7 @@ def main() -> int:
     _collect_output_positions(repo, store_source, args.timeout, edges, seen)
     for config in args.nixos_config:
         _collect_nixos_definitions(repo, store_source, args.timeout, edges, seen, config)
+    _collect_static_nix_path_edges(repo, edges, seen)
 
     files = sorted({edge["target"] for edge in edges})
     print(json.dumps({"repo": str(repo), "store_source": store_source, "files": files, "edges": edges}, indent=2, sort_keys=True))
