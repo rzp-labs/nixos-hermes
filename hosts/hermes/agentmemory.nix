@@ -10,6 +10,8 @@ let
   cfg = config.services.agentmemory;
   stateDir = "/var/lib/agentmemory";
   dataDir = "${stateDir}/data";
+  cacheDir = "/var/cache/agentmemory";
+  transformersCacheDir = "${cacheDir}/transformers";
   restPort = 3111;
   streamsPort = 3112;
   normalizedLlmBaseUrl = lib.removeSuffix "/" cfg.llm.baseUrl;
@@ -17,6 +19,12 @@ let
   enginePort = 49134;
   yaml = pkgs.formats.yaml { };
   agentmemoryRoot = "${cfg.package}/lib/node_modules/@agentmemory/agentmemory";
+  transformersRuntimeConfig = pkgs.writeText "agentmemory-transformers-runtime.mjs" ''
+    import { env } from "${agentmemoryRoot}/node_modules/@xenova/transformers/src/env.js";
+
+    env.cacheDir = process.env.TRANSFORMERS_CACHE || "${transformersCacheDir}";
+    env.useFSCache = true;
+  '';
   startScript = pkgs.writeShellScript "agentmemory-start" ''
     set -eu
     ${lib.optionalString cfg.llm.enable ''
@@ -263,6 +271,9 @@ in
           III_VIEWER_PORT = toString viewerPort;
           III_ENGINE_URL = "ws://127.0.0.1:${toString enginePort}";
           VIEWER_ALLOWED_ORIGINS = "http://127.0.0.1:${toString restPort},http://127.0.0.1:${toString viewerPort},http://localhost:${toString restPort},http://localhost:${toString viewerPort}";
+          TRANSFORMERS_CACHE = transformersCacheDir;
+          XDG_CACHE_HOME = cacheDir;
+          NODE_OPTIONS = "--import ${transformersRuntimeConfig}";
         }
         // lib.optionalAttrs cfg.llm.enable {
           OPENAI_BASE_URL = cfg.llm.baseUrl;
@@ -286,6 +297,7 @@ in
           iiiConfig
           readyCheck
           startScript
+          transformersRuntimeConfig
           cfg.package
         ];
 
@@ -298,6 +310,11 @@ in
             "agentmemory/data"
           ];
           StateDirectoryMode = "0700";
+          CacheDirectory = [
+            "agentmemory"
+            "agentmemory/transformers"
+          ];
+          CacheDirectoryMode = "0700";
           WorkingDirectory = stateDir;
           ExecStart = startScript;
           ExecStartPost = readyCheck;
@@ -313,7 +330,10 @@ in
           PrivateTmp = true;
           ProtectSystem = "strict";
           ProtectHome = true;
-          ReadWritePaths = [ stateDir ];
+          ReadWritePaths = [
+            stateDir
+            cacheDir
+          ];
           RestrictAddressFamilies = [
             "AF_UNIX"
             "AF_INET"

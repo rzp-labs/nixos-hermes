@@ -323,6 +323,7 @@
               env = unit.environment;
               service = unit.serviceConfig;
               stateDirectories = pkgs.lib.toList service.StateDirectory;
+              cacheDirectories = pkgs.lib.toList service.CacheDirectory;
               hermesMcp = hostConfig.services.hermes-agent.mcpServers.agentmemory;
               hermesPluginNames = builtins.concatStringsSep "\n" (
                 map toString hostConfig.services.hermes-agent.extraPlugins
@@ -356,6 +357,11 @@
               test '${env.AGENTMEMORY_LLM_TIMEOUT_MS}' = '120000'
               test '${env.OPENAI_TIMEOUT_MS}' = '120000'
               test '${env.EMBEDDING_PROVIDER}' = 'local'
+              test '${env.TRANSFORMERS_CACHE}' = '/var/cache/agentmemory/transformers'
+              test '${env.XDG_CACHE_HOME}' = '/var/cache/agentmemory'
+              grep -q -- 'agentmemory-transformers-runtime.mjs' <<'EOF'
+              ${env.NODE_OPTIONS}
+              EOF
               test '${if builtins.hasAttr "OPENAI_API_KEY" env then "true" else "false"}' = 'false'
               test '${env.III_REST_PORT}' = '3111'
               test '${env.III_STREAMS_PORT}' = '3112'
@@ -366,6 +372,7 @@
               test '${service.Group}' = 'agentmemory'
 
               test '${builtins.concatStringsSep " " stateDirectories}' = 'agentmemory agentmemory/data'
+              test '${builtins.concatStringsSep " " cacheDirectories}' = 'agentmemory agentmemory/transformers'
               test '${service.WorkingDirectory}' = '/var/lib/agentmemory'
               test '${service.TimeoutStopSec}' = '10s'
               test '${hermesMcp.command}' = '${hostConfig.services.agentmemory.package}/bin/agentmemory'
