@@ -20,7 +20,7 @@ let
   yaml = pkgs.formats.yaml { };
   agentmemoryRoot = "${cfg.package}/lib/node_modules/@agentmemory/agentmemory";
   transformersRuntimeConfig = pkgs.writeText "agentmemory-transformers-runtime.mjs" ''
-    import { env } from "${agentmemoryRoot}/node_modules/@xenova/transformers/src/env.js";
+    import { env } from "${agentmemoryRoot}/node_modules/@xenova/transformers/src/transformers.js";
 
     env.cacheDir = process.env.TRANSFORMERS_CACHE || "${transformersCacheDir}";
     env.useFSCache = true;

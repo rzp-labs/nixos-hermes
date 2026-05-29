@@ -48,7 +48,7 @@ let
     try:
         import hermes_cli as _hermes_cli
 
-        if _HERMES_CLI_SOURCE not in _hermes_cli.__path__:
+        if hasattr(_hermes_cli, "__path__") and _HERMES_CLI_SOURCE not in _hermes_cli.__path__:
             _hermes_cli.__path__.append(_HERMES_CLI_SOURCE)
     except ImportError:
         pass
