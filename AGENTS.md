@@ -14,8 +14,19 @@ nixos-hermes/
 │   ├── assets/
 │   │   ├── age-test-key.txt             # throwaway age key (committed — encrypts only dummy test data)
 │   │   └── test-secrets.yaml            # sops-encrypted dummy secrets for VM tests
+│   ├── eval/                            # pure-eval assertion checks (one file per check)
+│   │   ├── default.nix                  # aggregator: feeds host config/pkgs into each check
+│   │   ├── hermes-runtime-packaging.nix # hermes venv imports + opus shim
+│   │   ├── repowise-nix-tooling.nix     # Repowise / vite-plus / cli-proxy-api wiring
+│   │   ├── agentmemory-service-config.nix # agentmemory unit + Hermes plugin wiring
+│   │   ├── netdata-service-config.nix   # Netdata config + observe wrapper + MCP wiring
+│   │   └── hindsight-service-config.nix # asserts Hindsight memory stays disabled
 │   └── default.nix                      # nixosTest VM test suite
-├── flake.nix                            # flake inputs/outputs, host definition
+├── checks/
+│   └── pre-commit.nix                   # git-hooks.nix hook config (dev shell + pre-commit-check)
+├── apps/
+│   └── default.nix                      # flake apps: nixos-anywhere, disko, *-smoke wrappers
+├── flake.nix                            # thin manifest: inputs/outputs, host definition, wiring
 ├── .github/workflows/flakehub-publish-rolling.yml # CI: publish to FlakeHub on push to main
 ├── .sops.yaml                           # sops encryption policy (age)
 ├── .agents/                             # committed local agent skills (GitButler workflow)
@@ -137,6 +148,8 @@ Right tool, right job. Pick the lightest tool that covers the change.
 For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home/admin/workspace/nixos-hermes` with all unrelated GitButler branches unapplied and only the target branch under test applied. This proves the local flake without contamination from the agent workspace's other applied stacks. Always run `sudo nixos-rebuild test --flake .#nixos-hermes -L` before any persistent switch so reboot rollback remains available if the tested generation misbehaves. Before live-host mutation, take a ZFS recovery snapshot such as `sudo zfs snapshot -r rpool@pre-<change>-$(date -u +%Y%m%dT%H%M%SZ)` so filesystem/runtime state has a known-good restore point, not just Nix generation rollback. Live `nixos-rebuild switch` remains FlakeHub-based, not local-workspace based, unless explicitly authorized otherwise: after local host validation passes, open/review/merge the PR, wait for CI and FlakeHub publication, then switch from the remote published flake.
 
 The VM tests live under `tests/` and run via QEMU — no root needed.
+Pure-evaluation assertion checks (no guest boot) live under `tests/eval/`;
+both surface through the flake `checks.x86_64-linux.*` output.
 `checks.x86_64-linux.vm-switch-smoke` is the heaviest repo-owned smoke:
 it boots a VM, switches to a prebuilt target system inside the guest with
 `switch-to-configuration switch`, and verifies `/etc` plus
@@ -160,10 +173,20 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 
 ### `flake.nix`
 
-*Single host output: `nixosConfigurations.nixos-hermes`.*
+*Thin manifest: input pins + output wiring. Single host output: `nixosConfigurations.nixos-hermes`.*
 
 - Manages input pins.
 - Do not add multiple hosts without a corresponding refactor of the module tree.
+- Keep it thin. Output *logic* (test bodies, hook config, app wrappers) lives in
+  dedicated files that `flake.nix` imports — see `tests/eval/`, `checks/`, and
+  `apps/` below. When adding an output, add a file and wire it here; do not inline
+  large attrsets back into `flake.nix`.
+- Make platform boundaries explicit at the import/derivation-definition site, not
+  only at the final attribute merge. If an output is Linux-only, put its
+  `callPackage`, `import`, or `writeShellApplication` binding inside the
+  `system == "x86_64-linux"` guard even when Nix laziness would avoid forcing it
+  on Darwin. This is readability policy: reviewers should see unsupported systems
+  are never asked to construct Linux-only values.
 
 *`nixosModules.default` convention*
 
@@ -199,6 +222,43 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
     - Pinned via `flake.lock` so bootstrap runs are reproducible; revisit when upstream publishes a version.
   - `numtide/llm-agents.nix`
     - Not published to FlakeHub at this time.
+
+### `tests/eval/`
+
+*Pure-evaluation assertion checks, one file per check.*
+
+- Each `tests/eval/<name>.nix` is a function `{ pkgs, hostConfig, hostPkgs, ... }:`
+  returning a `runCommand` derivation that asserts on the *built* host config
+  (unit env, package versions, wrapper script contents, plugin wiring, …).
+- `tests/eval/default.nix` is the aggregator: it takes the evaluated
+  `hostSystem` once and feeds `config`/`pkgs` into each check, then surfaces them
+  through `flake.nix`'s `checks.x86_64-linux.*` output.
+- These are evaluation/build checks, **not** VM tests — they sit alongside the VM
+  suite in `tests/` but never boot a guest. Run one with
+  `nix build .#checks.x86_64-linux.<name>`.
+- Path literals inside a check resolve relative to the file, so reference repo
+  paths as `../../packages/...`, `../../hosts/...`, etc. — not `./...`.
+
+### `checks/pre-commit.nix`
+
+*git-hooks.nix hook configuration.*
+
+- Returns the `git-hooks.lib.<system>.run` result. Consumed twice: the dev shell
+  reads `.enabledPackages`/`.shellHook`, and `flake.nix` exposes the whole
+  derivation as `checks.<system>.pre-commit-check`.
+- `src = ../.` is the repo root (the file lives one level down in `checks/`).
+
+### `apps/default.nix`
+
+*Flake apps for a single dev system.*
+
+- Install-time CLIs (`nixos-anywhere`, `disko`) plus Linux-only operational
+  smokes that wrap scripts under `../tools`. Invoked as `nix run .#<app>`.
+- Receives `{ pkgs, lib, system, nixos-anywhere, disko }` from `flake.nix`; the
+  `x86_64-linux`-only apps are added via `lib.optionalAttrs`.
+- Keep Linux-only wrapper derivations inside the `x86_64-linux` attrset's local
+  `let`. Do not define them in the file-level `let` and rely on Nix laziness to
+  avoid Darwin evaluation.
 
 ### `hosts/hermes/default.nix`
 

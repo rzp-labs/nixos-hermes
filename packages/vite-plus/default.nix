@@ -49,7 +49,6 @@ stdenv.mkDerivation rec {
       repair_vite_plus_shims
       exit \$rc
     fi
-    fi
 
     exec -a "\$0" "\$real_vp" "\$@"
     EOF

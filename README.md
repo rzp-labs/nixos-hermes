@@ -81,7 +81,10 @@ gateway. Update your SSH config when it changes.
 
 ```text
 nixos-hermes/
-├── flake.nix                          # Flake inputs/outputs, host definition
+├── flake.nix                          # Thin manifest: inputs/outputs, host definition, wiring
+├── checks/pre-commit.nix              # git-hooks.nix hook config (dev shell + pre-commit-check)
+├── apps/default.nix                   # flake apps: nixos-anywhere, disko, smoke wrappers
+├── tests/                             # VM tests (tests/default.nix) + eval checks (tests/eval/)
 ├── .github/workflows/flakehub-publish-rolling.yml  # CI: publish to FlakeHub on push to main
 ├── .sops.yaml                         # sops encryption rules (age keys)
 ├── .secrets/                          # gitignored — plaintext secrets (local only)
@@ -193,6 +196,13 @@ mechanical prefilter: it runs the repo-owned check script on a fresh generic Nix
 runner and permits builds during `nix flake check` so import-from-derivation
 helpers are realized in the cold CI store. A green check proves the flake
 evaluates, repo-owned checks build, and generated configuration invariants pass.
+
+Contributor-facing flake outputs support both `x86_64-linux` and
+`aarch64-darwin`. Keep platform-specific outputs explicit: Linux-only checks,
+apps, imports, and wrapper derivations should be defined inside their
+`x86_64-linux` guard, not in an outer `let` that relies on Nix laziness to avoid
+Darwin evaluation. This keeps cross-platform intent obvious to reviewers and bot
+checks.
 
 It is not deployment proof. The production host uses the Determinate NixOS image
 and has real hardware, secrets, mutable service state, and activation behavior
