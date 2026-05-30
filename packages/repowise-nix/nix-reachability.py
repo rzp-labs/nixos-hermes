@@ -122,26 +122,67 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
               output = "${attrName}.${system}.${name}";
               position = posOrNull name flake.outputs.${attrName}.${system};
               metaPosition = metaPosition flake.outputs.${attrName}.${system}.${name};
+              proof = "nix_eval_output_position";
             }) (builtins.attrNames flake.outputs.${attrName}.${system})
           ) systems);
-        formatter =
-          if !(has flake.outputs "formatter") then [] else
+        collectSystemSingleton = attrName:
+          if !(has flake.outputs attrName) then [] else
           builtins.concatLists (map (system:
-            if !(has flake.outputs.formatter system) then [] else [{
-              output = "formatter.${system}";
-              position = posOrNull system flake.outputs.formatter;
-              metaPosition = metaPosition flake.outputs.formatter.${system};
+            if !(has flake.outputs.${attrName} system) then [] else [{
+              output = "${attrName}.${system}";
+              position = posOrNull system flake.outputs.${attrName};
+              metaPosition = metaPosition flake.outputs.${attrName}.${system};
+              proof = "nix_eval_output_position";
             }]
           ) systems);
-        nixos =
-          if !(has flake.outputs "nixosConfigurations") then [] else
-          builtins.map (name: {
-            output = "nixosConfigurations.${name}";
-            position = posOrNull name flake.outputs.nixosConfigurations;
+        collectTopLevel = attrName:
+          if !(has flake.outputs attrName) then [] else
+          let value = flake.outputs.${attrName}; in
+          if builtins.isAttrs value then
+            builtins.map (name: {
+              output = "${attrName}.${name}";
+              position = posOrNull name value;
+              metaPosition = null;
+              proof = "nix_eval_output_position";
+            }) (builtins.attrNames value)
+          else [{
+            output = attrName;
+            position = posOrNull attrName flake.outputs;
             metaPosition = null;
-          }) (builtins.attrNames flake.outputs.nixosConfigurations);
+            proof = "nix_eval_output_position";
+          }];
+        conventional =
+          (collectSystem "packages")
+          ++ (collectSystem "checks")
+          ++ (collectSystem "devShells")
+          ++ (collectSystem "apps")
+          ++ (collectSystemSingleton "formatter")
+          ++ (collectSystemSingleton "legacyPackages")
+          ++ (collectTopLevel "nixosConfigurations")
+          ++ (collectTopLevel "homeConfigurations")
+          ++ (collectTopLevel "darwinConfigurations")
+          ++ (collectTopLevel "nixosModules")
+          ++ (collectTopLevel "homeManagerModules")
+          ++ (collectTopLevel "darwinModules")
+          ++ (collectTopLevel "templates")
+          ++ (collectTopLevel "overlays")
+          ++ (collectTopLevel "lib");
+        conventionalNames = [
+          "packages" "checks" "devShells" "apps" "formatter" "legacyPackages"
+          "nixosConfigurations" "homeConfigurations" "darwinConfigurations"
+          "nixosModules" "homeManagerModules" "darwinModules" "templates" "overlays" "lib"
+        ];
+        customTopLevel =
+          builtins.concatLists (map (name:
+            if builtins.elem name conventionalNames then [] else [{
+              output = name;
+              position = posOrNull name flake.outputs;
+              metaPosition = null;
+              proof = "nix_eval_custom_output_position";
+            }]
+          ) (builtins.attrNames flake.outputs));
         inputPaths = builtins.mapAttrs (name: input: input.outPath or null) flake.inputs;
-      in { outputs = (collectSystem "packages") ++ (collectSystem "checks") ++ (collectSystem "devShells") ++ (collectSystem "apps") ++ formatter ++ nixos; inputs = inputPaths; }
+      in { outputs = conventional ++ customTopLevel; inputs = inputPaths; }
     '''
     data = _run_json(repo, expr, timeout)
     repo_resolved = repo.resolve()
@@ -180,7 +221,7 @@ def _collect_output_positions(repo: Path, store_source: str, timeout: int, edges
             seen,
             item["output"],
             rel,
-            "nix_eval_output_position",
+            item.get("proof", "nix_eval_output_position"),
             "flake output attribute position from builtins.unsafeGetAttrPos",
             line=pos.get("line"),
             column=pos.get("column"),

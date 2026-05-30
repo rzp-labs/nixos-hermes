@@ -77,6 +77,13 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   grep -q -- 'nix_eval_output_position' '${../../packages/repowise-nix/nix-reachability.py}'
   grep -q -- 'nix_eval_flake_input' '${../../packages/repowise-nix/nix-reachability.py}'
   grep -q -- 'nix_eval_option_definition' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'homeConfigurations' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'nixosModules' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'homeManagerModules' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'darwinModules' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'templates' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'overlays' '${../../packages/repowise-nix/nix-reachability.py}'
+  grep -q -- 'nix_eval_custom_output_position' '${../../packages/repowise-nix/nix-reachability.py}'
   if REPOWISE_REPO="$PWD/missing" '${hostPkgs.repowise-nix}/bin/repowise-nix' status 2>err; then
     echo 'expected missing REPOWISE_REPO to fail' >&2
     exit 1

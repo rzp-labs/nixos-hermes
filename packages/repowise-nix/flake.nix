@@ -79,6 +79,13 @@
                 grep -q -- 'nix_eval_output_position' '${./nix-reachability.py}'
                 grep -q -- 'nix_eval_flake_input' '${./nix-reachability.py}'
                 grep -q -- 'nix_eval_option_definition' '${./nix-reachability.py}'
+                grep -q -- 'homeConfigurations' '${./nix-reachability.py}'
+                grep -q -- 'nixosModules' '${./nix-reachability.py}'
+                grep -q -- 'homeManagerModules' '${./nix-reachability.py}'
+                grep -q -- 'darwinModules' '${./nix-reachability.py}'
+                grep -q -- 'templates' '${./nix-reachability.py}'
+                grep -q -- 'overlays' '${./nix-reachability.py}'
+                grep -q -- 'nix_eval_custom_output_position' '${./nix-reachability.py}'
                 if REPOWISE_REPO="$PWD/missing" '${repowise-nix}/bin/repowise-nix' status 2>err; then
                   echo 'expected missing REPOWISE_REPO to fail' >&2
                   exit 1
