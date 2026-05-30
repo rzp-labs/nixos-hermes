@@ -12,7 +12,7 @@
     sops-nix.url = "https://flakehub.com/f/Mic92/sops-nix/0.1.1200";
     disko.url = "https://flakehub.com/f/nix-community/disko/*";
     disko.inputs.nixpkgs.follows = "nixpkgs";
-    home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0.2511.*";
+    home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.url = "github:nix-community/nixos-anywhere";
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
