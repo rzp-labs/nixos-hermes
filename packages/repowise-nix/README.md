@@ -23,7 +23,6 @@ repowise-nix refresh --test-run
 repowise-nix reindex
 repowise-nix search "workspace task backend" --mode semantic --limit 5
 repowise-nix dead-code
-repowise-nix nix-reachability --nixos-config nixos-hermes
 ```
 
 The wrapper passes through commands it does not special-case, so upstream commands such as `dead-code`, `health`, and `risk` stay available without reimplementing the CLI surface. Excludes are applied only to wrapper-managed indexing/generation commands where upstream accepts `--exclude`.
@@ -56,27 +55,19 @@ REPOWISE_EXTRA_EXCLUDES='docs/spikes/repowise-nix/artifacts/**:vendor/**' \
 REPOWISE_EDITOR_SETUP=1 repowise-nix generate --test-run
 ```
 
-## Native Nix reachability adapter
+## Nix-aware dead-code behavior
 
-`repowise-nix nix-reachability` is the first-class Nix adapter. It invokes
-`nix eval` against the target flake and emits JSON reachability evidence from
-evaluated flake outputs, local flake inputs, and selected NixOS module option
-definition locations. This is the preferred signal for Nix dead-code decisions
-because it is evaluator-derived, not a directory-name heuristic.
+`repowise-nix dead-code` is the user-facing command. For flake repos, it asks
+Nix which local files are used by evaluated flake outputs, local path inputs,
+and selected NixOS module option definitions. Those evaluated file-usage facts
+are used internally so live `.nix` files are not reported as dead code just
+because static parsing missed an edge.
 
-Example:
-
-```bash
-REPOWISE_REPO=/path/to/flake \
-  repowise-nix nix-reachability --nixos-config nixos-hermes
-```
-
-The output uses proof-typed edges such as `nix_eval_output_position`,
-`nix_eval_flake_input`, `nix_eval_module`, and
-`nix_eval_option_definition`. `repowise-nix dead-code` refuses to use static
-Nix heuristics as a reachability fallback for flakes: if native evaluation
-fails, the command fails hard and asks for the Nix evaluation problem to be
-fixed.
+If Nix evaluation fails, Repowise follows the same pattern as unavailable
+tree-sitter languages: it logs a debug message such as
+`eval failed language=nix reason="..."`, suppresses `.nix` findings, and still
+returns dead-code results for the rest of the repo. Mixed-language repos should
+not lose Python/JS/etc. results because their flake is temporarily broken.
 
 ## Static Nix parsing scope
 

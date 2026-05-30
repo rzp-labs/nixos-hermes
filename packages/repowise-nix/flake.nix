@@ -74,7 +74,8 @@
                 grep -q -- 'nix_dead_code_cmd.py' '${repowise-nix}/bin/repowise-nix'
                 grep -q -- 'nix-reachability' '${repowise-nix}/bin/repowise-nix'
 
-                grep -q -- 'Fix the Nix evaluation error below' '${./nix_dead_code_cmd.py}'
+                grep -q -- 'eval failed language=nix' '${./nix_dead_code_cmd.py}'
+                grep -q -- 'suppress_nix_findings' '${./nix_dead_code_cmd.py}'
                 grep -q -- 'nix_eval_output_position' '${./nix-reachability.py}'
                 grep -q -- 'nix_eval_flake_input' '${./nix-reachability.py}'
                 grep -q -- 'nix_eval_option_definition' '${./nix-reachability.py}'

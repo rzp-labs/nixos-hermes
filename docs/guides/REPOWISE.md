@@ -36,7 +36,6 @@ repowise-nix refresh --test-run  # alias for generate
 repowise-nix reindex
 repowise-nix search "hermes workspace task backend" --mode semantic --limit 5
 repowise-nix dead-code
-repowise-nix nix-reachability --nixos-config nixos-hermes
 ```
 
 The wrapper defaults to `$PWD`, not a Hermes or NixOS host path. Override with:
@@ -67,26 +66,21 @@ The OpenAI provider default matches Repowise's OpenAI-compatible SDK path. This 
 
 Do not commit keys. Use environment or sops-managed runtime files only.
 
-## Native Nix reachability support
+## Nix-aware dead-code behavior
 
-`repowise-nix nix-reachability` is the first-class Nix adapter. It runs
-bounded `nix eval` queries against the target flake and emits proof-typed JSON
-edges from evaluated flake outputs, local flake inputs, and selected NixOS
-module option definition locations. Use it when judging Nix file reachability;
-it is evaluator evidence, not a heuristic suppression list.
+`repowise-nix dead-code` is the user-facing workflow. For flake repos, the
+wrapper asks Nix which local files are used by evaluated flake outputs, local
+path inputs, and selected NixOS module option definitions. That evaluated
+file-usage evidence is internal plumbing for avoiding false-positive `.nix`
+dead-code findings; operators should not need a separate command for normal
+dead-code scans.
 
-```bash
-REPOWISE_REPO=/var/lib/hermes/workspace/nixos-hermes \
-  repowise-nix nix-reachability --nixos-config nixos-hermes
-```
-
-The initial adapter intentionally does not build derivations or require secrets.
-It proves the evaluated surface it asks for; it does not claim global truth for
-outputs or Nix expressions outside that surface.
-
-`repowise-nix dead-code` fails hard when native Nix reachability cannot be
-collected for a flake. Static Nix parsing is not an acceptable reachability
-fallback; fix the Nix evaluation surface instead of accepting heuristic proof.
+If Nix evaluation fails, the dead-code run still completes for the rest of the
+repo. The wrapper logs a debug message matching Repowise's optional-language
+pattern, for example `eval failed language=nix reason="..."`, and suppresses
+`.nix` findings so a broken flake does not create misleading deletion advice.
+Fix the flake when you need Nix-specific findings; do not block Python/JS/etc.
+dead-code output on Nix evaluation health.
 
 ## Nix static parsing scope
 
