@@ -28,6 +28,7 @@
   networking.hostId = "52dd4e5a";
 
   system.stateVersion = "25.05";
+
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   nix.settings.trusted-users = [ "admin" ];
 }

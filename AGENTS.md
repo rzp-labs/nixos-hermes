@@ -142,10 +142,11 @@ Right tool, right job. Pick the lightest tool that covers the change.
 | Nix eval / syntax | `nix flake check --no-build` | No |
 | Package add / module option | `nixos-rebuild dry-build --flake .#nixos-hermes` | No |
 | systemd unit change | `nixos-rebuild dry-activate` | Yes |
+| Release-line / channel bump | eval + dry-build + `dry-activate` + critical option/unit diff + ZFS snapshot + `nixos-rebuild test` | Mixed |
 | Activation script change | `nix build .#checks.x86_64-linux.<test>` (VM) | No |
 | Real secrets / hardware / network | `nixos-rebuild test` | Yes |
 
-For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home/admin/workspace/nixos-hermes` with all unrelated GitButler branches unapplied and only the target branch under test applied. This proves the local flake without contamination from the agent workspace's other applied stacks. Always run `sudo nixos-rebuild test --flake .#nixos-hermes -L` before any persistent switch so reboot rollback remains available if the tested generation misbehaves. Before live-host mutation, take a ZFS recovery snapshot such as `sudo zfs snapshot -r rpool@pre-<change>-$(date -u +%Y%m%dT%H%M%SZ)` so filesystem/runtime state has a known-good restore point, not just Nix generation rollback. Live `nixos-rebuild switch` remains FlakeHub-based, not local-workspace based, unless explicitly authorized otherwise: after local host validation passes, open/review/merge the PR, wait for CI and FlakeHub publication, then switch from the remote published flake.
+For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home/admin/workspace/nixos-hermes` with all unrelated GitButler branches unapplied and only the target branch under test applied. This proves the local flake without contamination from the agent workspace's other applied stacks. Always run `sudo nixos-rebuild test --flake .#nixos-hermes -L` before any persistent switch so reboot rollback remains available if the tested generation misbehaves. Before live-host mutation, take a ZFS recovery snapshot such as `sudo zfs snapshot -r rpool@pre-<change>-$(date -u +%Y%m%dT%H%M%SZ)` so filesystem/runtime state has a known-good restore point, not just Nix generation rollback. If a failed `test` leaves `/run/current-system` on a temporary generation while `/nix/var/nix/profiles/system` still points at the old boot-default generation, reboot back to boot-default before snapshotting and continuing. Live `nixos-rebuild switch` remains FlakeHub-based, not local-workspace based, unless explicitly authorized otherwise: after local host validation passes, open/review/merge the PR, wait for CI and FlakeHub publication, then switch from the remote published flake.
 
 The VM tests live under `tests/` and run via QEMU — no root needed.
 Pure-evaluation assertion checks (no guest boot) live under `tests/eval/`;
@@ -161,7 +162,14 @@ be valuable for other changes where the build alone is insufficient.
 Use judgment — the table above is guidance, not a hard constraint.
 `dry-activate` runs `switch-to-configuration dry-activate` to diff
 systemd units without applying changes — needs root but does not
-mutate the running system.
+mutate the running system. Treat it as risk discovery, not proof: it shows
+which reloads/restarts would be attempted, but cannot prove the live daemon will
+complete them. For release-line/channel bumps, also diff critical options and
+units against the boot-default generation before the first live `test`; defaults
+can change core services even when the handwritten config diff is small. In
+particular, keep broad channel bumps from silently migrating D-Bus
+implementation (`dbus-daemon` -> `dbus-broker`) unless that migration is the
+explicit goal and has reboot/restart-shaped validation.
 
 **Exception to the age private key rule:** `tests/assets/age-test-key.txt`
 is a throwaway key committed intentionally — it encrypts only dummy test

@@ -163,17 +163,28 @@ There is no automated deployment step yet. For host-affecting feature branches,
 use the branch itself as the deployment artifact:
 
 1. Push the branch with `but push` so a remote flake ref exists.
-2. Run `nixos-rebuild test` from the local checkout for fast live validation
+2. Run local pre-host validation from a clean checkout: `nix flake check
+   --no-build`, `nixos-rebuild dry-build`, and, for unit/runtime changes,
+   `nixos-rebuild dry-activate`.
+3. For release-line/channel bumps, treat the change as a runtime migration even
+   when the handwritten diff is small: inspect critical option and systemd unit
+   diffs, avoid implicit D-Bus implementation migration unless intentional, and
+   take a recursive ZFS snapshot before the first live activation attempt.
+4. Run `nixos-rebuild test` from the local checkout for fast live validation
    without changing the boot default.
-3. Run the relevant local validation and post-test smoke checks; commit and push
+5. Run the relevant local validation and post-test smoke checks; commit and push
    any fixes.
-4. Open the PR once the pushed branch contains the validated local state.
-5. Run `nixos-rebuild switch` from the remote branch flake ref, not the local
+6. Open the PR once the pushed branch contains the validated local state.
+7. Run `nixos-rebuild switch` from the remote branch flake ref, not the local
    checkout, so boot-default deployment proves the remote PR branch is
    self-contained and in sync with what was tested locally.
 
 ```bash
 ssh admin@nixos-hermes
+nix flake check --no-build --no-eval-cache -L
+nixos-rebuild dry-build --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
+sudo nixos-rebuild dry-activate --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
+sudo zfs snapshot -r rpool@pre-<change>-$(date -u +%Y%m%dT%H%M%SZ)
 sudo nixos-rebuild test --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
 sudo nixos-rebuild switch --flake \
   'git+https://github.com/rzp-labs/nixos-hermes.git?ref=refs/heads/<branch>#nixos-hermes' -L

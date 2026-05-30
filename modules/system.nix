@@ -21,6 +21,13 @@
     }
   ];
 
+  # Keep broad release-line updates from also migrating the live host from
+  # dbus-daemon to dbus-broker. NixOS 26.05 defaults to broker, but switching
+  # an already-running system can leave the old dbus-daemon under a new
+  # Type=notify-reload unit and make `nixos-rebuild test` time out reloading
+  # user/system buses. Migrate D-Bus separately with reboot-shaped validation.
+  services.dbus.implementation = "dbus";
+
   security.sudo.wheelNeedsPassword = false;
 
   environment.systemPackages = with pkgs; [
