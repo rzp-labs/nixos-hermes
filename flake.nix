@@ -25,7 +25,7 @@
     llm-agents.url = "github:numtide/llm-agents.nix";
     # Keep GitButler on a separately validated llm-agents revision while allowing
     # the main llm-agents input to advance OMP and other agent tools.
-    llm-agents-gitbutler.url = "github:numtide/llm-agents.nix/a7ad64dd500337232a35b5db16527475e8eec9a2";
+    llm-agents-gitbutler.url = "github:numtide/llm-agents.nix/c2ef928cbadd60280699e828973b14e21557c7ff";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
