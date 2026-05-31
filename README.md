@@ -104,6 +104,41 @@ nixos-hermes/
 
 ---
 
+## Local Development
+
+Contributor tooling is provided by a dedicated `shell.nix` used by the flake:
+
+```nix
+{
+  devShells.${system}.default = import ./shell.nix { inherit pkgs hooks; };
+}
+```
+
+The shell includes:
+
+- Pre-commit hook packages (`hooks.enabledPackages` when hooks are available)
+- `sops`
+- `prek`
+- `nixd`
+- `nil`
+- `alejandra`
+- `statix`
+- `deadnix`
+
+### direnv and auto-loading
+
+To keep the shell loaded automatically when entering the repository, install
+`direnv` and `nix-direnv`, then use:
+
+```bash
+direnv allow
+```
+
+This repository ships `.envrc` with `use flake`, so `direnv` will enter the same
+development shell automatically on both macOS and Linux.
+
+---
+
 ## Bootstrapping the Host
 
 Two supported paths. Prefer **nixos-anywhere** for a headless remote install;

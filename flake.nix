@@ -97,13 +97,7 @@
           hooks = self.checks.${system}.pre-commit-check;
         in
         {
-          default = pkgs.mkShell {
-            packages = hooks.enabledPackages ++ [
-              pkgs.sops
-              pkgs.prek
-            ];
-            shellHook = hooks.shellHook;
-          };
+          default = import ./shell.nix { inherit pkgs hooks; };
         }
       );
 
