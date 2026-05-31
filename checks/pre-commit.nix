@@ -11,9 +11,10 @@
 }:
 git-hooks.lib.${system}.run {
   src = ../.;
+  default_stages = [ "pre-commit" ];
   hooks = {
     # Nix formatting
-    nixfmt-rfc-style.enable = true;
+    nixfmt.enable = true;
 
     # Secret scanning — knows 150+ patterns
     gitleaks = {

@@ -5,26 +5,31 @@ let
     nodejs # NixOS-compatible runtime for Vite+
     vite-plus
   ];
-
   vitePlusHome = {
     sessionPath = [
       "$HOME/.vite-plus/bin"
     ];
   };
-
   vitePlusBashInit = ''
     if [ -f "$HOME/.vite-plus/env" ]; then
       . "$HOME/.vite-plus/env"
     fi
   '';
+  sharedUserConfig = {
+    manual.manpages.enable = false;
+    programs.bash.enable = true;
+    programs.bash.initExtra = vitePlusBashInit;
+  };
+  direnvConfig = {
+    programs.direnv.enable = true;
+    programs.direnv.nix-direnv.enable = true;
+  };
 in
 {
   home-manager.useGlobalPkgs = true;
   home-manager.useUserPackages = true;
 
-  home-manager.users.admin = {
-    manual.manpages.enable = false;
-
+  home-manager.users.admin = pkgs.lib.recursiveUpdate sharedUserConfig direnvConfig // {
     home = vitePlusHome // {
       stateVersion = "25.05";
       packages =
@@ -42,20 +47,11 @@ in
         XDG_CONFIG_HOME = "$HOME/.config";
       };
     };
-
-    programs.bash.enable = true;
-    programs.bash.initExtra = vitePlusBashInit;
   };
-
-  home-manager.users.hermes = {
-    manual.manpages.enable = false;
-
+  home-manager.users.hermes = sharedUserConfig // {
     home = vitePlusHome // {
       stateVersion = "25.05";
       packages = vitePlusToolchain;
     };
-
-    programs.bash.enable = true;
-    programs.bash.initExtra = vitePlusBashInit;
   };
 }

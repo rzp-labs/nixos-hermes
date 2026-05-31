@@ -6,7 +6,7 @@
   projectRootFile = "flake.nix";
 
   programs.nixfmt.enable = true;
-  programs.nixfmt.package = pkgs.nixfmt-rfc-style;
+  programs.nixfmt.package = pkgs.nixfmt;
 
   # Also enable deadnix to clean up nix files (remove dead code, format shebangs).
   # Run separately: `deadnix -f` for format, `deadnix -w` for format+write.
