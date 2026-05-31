@@ -48,7 +48,7 @@ pkgs.runCommand "netdata-service-config" { } ''
   test '${toString (builtins.elem "systemd-journal" hermesUserGroups)}' = '1'
   '${netdataObservePackage}/bin/netdata-observe' --help | grep -q -- 'logs \[unit\] \[lines\]'
   grep -q -- 'arbitrary journalctl arguments are not allowed' '${netdataObservePackage}/bin/netdata-observe'
-  grep -q -- 'netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service' '${netdataObservePackage}/bin/netdata-observe'
+  grep -q -- 'netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service|cliproxyapi-gateway.service' '${netdataObservePackage}/bin/netdata-observe'
   grep -q -- '--output=short-iso' '${netdataObservePackage}/bin/netdata-observe'
   grep -q -- '10#$lines' '${netdataObservePackage}/bin/netdata-observe'
   '${netdataObservePackage}/bin/netdata-observe' logs netdata.service 08 >/dev/null
