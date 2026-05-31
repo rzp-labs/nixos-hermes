@@ -17,6 +17,13 @@ let
   brokerUrl = "http://${bindHost}:${toString brokerPort}";
   gatewayBaseUrl = "http://${bindHost}:${toString gatewayPort}/v1";
 
+  adminXdgEnvironment = {
+    HOME = adminHome;
+    XDG_DATA_HOME = "${adminHome}/.local/share";
+    XDG_STATE_HOME = "${adminHome}/.local/state";
+    XDG_CACHE_HOME = "${adminHome}/.cache";
+  };
+
   installBrokerToken = pkgs.writeShellScript "omp-auth-broker-install-token" ''
     set -eu
     ${pkgs.coreutils}/bin/install -d -m 0700 -o admin -g users ${adminHome}/.omp
@@ -62,16 +69,21 @@ in
         # Hermes openai-codex provider here: Hermes 0.14 resolves that provider
         # through its own ChatGPT OAuth credential pool and ignores model.base_url.
         provider = "custom";
-        default = "gpt-5.5";
+        default = "openai-codex/gpt-5.5";
         base_url = gatewayBaseUrl;
         api_mode = "codex_responses";
         openai_runtime = "auto";
       };
 
       fallback_model = {
+        # Keep fallback behind the same local gateway, but route it to a
+        # different upstream provider/model so OpenAI OAuth exhaustion does not
+        # take out both primary and failover. Clear api_mode here so Hermes
+        # does not reuse the primary Codex Responses shaping for Antigravity.
         provider = "custom";
         base_url = gatewayBaseUrl;
-        model = "gpt-5.5";
+        model = "google-antigravity/gemini-3-flash-agent:high";
+        api_mode = "";
       };
     };
   };
@@ -89,9 +101,7 @@ in
       ];
       wantedBy = [ "multi-user.target" ];
 
-      environment = {
-        HOME = adminHome;
-      };
+      environment = adminXdgEnvironment;
 
       path = [
         pkgs.coreutils
@@ -133,8 +143,7 @@ in
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      environment = {
-        HOME = adminHome;
+      environment = adminXdgEnvironment // {
         OMP_AUTH_BROKER_URL = brokerUrl;
       };
 
