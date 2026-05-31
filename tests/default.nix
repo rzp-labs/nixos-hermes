@@ -33,13 +33,10 @@ let
       ];
 
       # Inject test age key via initrd — required because sops.age.keyFile
-      # rejects paths inside the Nix store (world-readable). Copying to /run
-      # during early boot places the key outside the store before activation.
-      # This is the same pattern sops-nix uses in its own integration tests.
-      boot.initrd.postDeviceCommands = ''
-        cp ${testAgeKeyFile} /run/age-keys.txt
-        chmod 600 /run/age-keys.txt
-      '';
+      # rejects paths inside the Nix store (world-readable). Copying through
+      # boot.initrd.secrets places the key outside the store before activation
+      # and works with systemd stage 1.
+      boot.initrd.secrets."run/age-keys.txt" = testAgeKeyFile;
 
       sops.age.keyFile = "/run/age-keys.txt";
       sops.age.sshKeyPaths = [ ];

@@ -12,7 +12,7 @@
     sops-nix.url = "https://flakehub.com/f/Mic92/sops-nix/0.1.1200";
     disko.url = "https://flakehub.com/f/nix-community/disko/*";
     disko.inputs.nixpkgs.follows = "nixpkgs";
-    home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0.2511.*";
+    home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nixos-anywhere.url = "github:nix-community/nixos-anywhere";
     nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
@@ -25,7 +25,7 @@
     llm-agents.url = "github:numtide/llm-agents.nix";
     # Keep GitButler on a separately validated llm-agents revision while allowing
     # the main llm-agents input to advance OMP and other agent tools.
-    llm-agents-gitbutler.url = "github:numtide/llm-agents.nix/a7ad64dd500337232a35b5db16527475e8eec9a2";
+    llm-agents-gitbutler.url = "github:numtide/llm-agents.nix/c2ef928cbadd60280699e828973b14e21557c7ff";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
