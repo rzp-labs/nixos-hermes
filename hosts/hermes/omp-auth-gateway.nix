@@ -69,7 +69,7 @@ in
         # Hermes openai-codex provider here: Hermes 0.14 resolves that provider
         # through its own ChatGPT OAuth credential pool and ignores model.base_url.
         provider = "custom";
-        default = "openai-codex/gpt-5.5";
+        default = "gpt-5.5";
         base_url = gatewayBaseUrl;
         api_mode = "codex_responses";
         openai_runtime = "auto";
@@ -82,7 +82,7 @@ in
         # does not reuse the primary Codex Responses shaping for Antigravity.
         provider = "custom";
         base_url = gatewayBaseUrl;
-        model = "google-antigravity/gemini-3-flash-agent:high";
+        model = "gemini-3-flash-agent:high";
         api_mode = "";
       };
     };
