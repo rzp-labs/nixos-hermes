@@ -30,6 +30,61 @@ let
   # the sealed environment. Extend the installed package path to the locked
   # source tree instead of patching generated/bundled output.
   opusCtypesShim = pkgs.writeTextDir "sitecustomize.py" ''
+    try:
+        import sys
+
+        def _patch_codex_adapter(module):
+            if hasattr(module, "_chat_messages_to_responses_input"):
+                if getattr(module._chat_messages_to_responses_input, "__patched__", False):
+                    return
+                orig_func = module._chat_messages_to_responses_input
+                import hashlib
+
+                def _safe_responses_call_id(call_id: str) -> str:
+                    if len(call_id) <= 64:
+                        return call_id
+                    digest = hashlib.sha256(call_id.encode("utf-8")).hexdigest()[:16]
+                    return f"{call_id[:47]}_{digest}"
+
+                def patched_func(*args, **kwargs):
+                    items = orig_func(*args, **kwargs)
+                    if isinstance(items, list):
+                        for item in items:
+                            if isinstance(item, dict):
+                                c_id = item.get("call_id")
+                                if isinstance(c_id, str):
+                                    item["call_id"] = _safe_responses_call_id(c_id)
+                    return items
+                patched_func.__patched__ = True
+                module._chat_messages_to_responses_input = patched_func
+
+        if "agent.codex_responses_adapter" in sys.modules:
+            _patch_codex_adapter(sys.modules["agent.codex_responses_adapter"])
+        else:
+            from importlib.abc import MetaPathFinder
+            import importlib.util
+
+            class ResponsesCallIdPatchFinder(MetaPathFinder):
+                def find_spec(self, fullname, path=None, target=None):
+                    if fullname == "agent.codex_responses_adapter":
+                        sys.meta_path.remove(self)
+                        try:
+                            spec = importlib.util.find_spec(fullname)
+                            if spec is not None and spec.loader is not None:
+                                orig_exec_module = spec.loader.exec_module
+                                def new_exec_module(module):
+                                    orig_exec_module(module)
+                                    _patch_codex_adapter(module)
+                                spec.loader.exec_module = new_exec_module
+                                return spec
+                        finally:
+                            sys.meta_path.append(self)
+                    return None
+
+            sys.meta_path.insert(0, ResponsesCallIdPatchFinder())
+    except Exception:
+        pass
+
     import ctypes.util as _cu
     from pathlib import Path as _Path
 
