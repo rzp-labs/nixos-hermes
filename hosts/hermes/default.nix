@@ -13,6 +13,7 @@
     ./agentmemory.nix
     ./netdata.nix
     ./omp-auth-gateway.nix
+    ./cliproxyapi-gateway.nix
     ../../modules/system.nix
     ../../modules/packages.nix
     ../../modules/home-manager.nix

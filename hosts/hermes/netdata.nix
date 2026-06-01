@@ -266,7 +266,7 @@ let
           fi
 
           case "$unit" in
-            netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service)
+            netdata.service|hermes-agent.service|agentmemory.service|hindsight-embed.service|omp-auth-gateway.service|cliproxyapi-gateway.service)
               ;;
             *)
               echo "Error: unit is not allowlisted for bounded log access: $unit" >&2

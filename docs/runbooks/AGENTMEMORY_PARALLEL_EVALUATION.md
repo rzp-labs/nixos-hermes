@@ -56,24 +56,25 @@ EMBEDDING_PROVIDER=local
 
 Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the proxy root (`http://10.0.0.102:8317`), not `http://10.0.0.102:8317/v1`.
 
-The CLIProxyAPI key is a raw SOPS secret readable only by the `agentmemory`
-service user:
+The CLIProxyAPI key is a raw SOPS secret shared by local managed services that
+need to call the OpenAI-compatible proxy. The current host-local ownership is:
 
 ```nix
 sops.secrets.cliproxyapi-key = {
-  owner = "agentmemory";
+  owner = "admin";
   group = "agentmemory";
-  mode = "0400";
+  mode = "0440";
 };
 ```
 
-The startup wrapper waits briefly for `/run/secrets/cliproxyapi-key`, reads it
-inside the service process, and exports `OPENAI_API_KEY` there. Do not use
-`LoadCredential` for this secret: during `nixos-rebuild test`/activation,
-systemd can attempt to load credentials while sops-nix is rotating the
-`/run/secrets` symlink, producing a transient `status=243/CREDENTIALS` start
-failure that fails the rebuild even if auto-restart succeeds seconds later. The
-key must not appear in Nix store-backed environment files or generated config.
+Agent Memory's startup wrapper waits briefly for `/run/secrets/cliproxyapi-key`,
+reads it inside the service process, and exports `OPENAI_API_KEY` there. Do not
+put this key in Nix store-backed environment files or generated config.
+
+Service-specific credential handling may still use `LoadCredential` when that
+service has been validated with its own activation/restart shape. For example,
+`hindsight-embed.service` uses `LoadCredential` for the same secret; do not treat
+the Agent Memory wrapper rule as a global ban.
 
 ## Runtime flags
 

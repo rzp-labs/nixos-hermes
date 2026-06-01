@@ -26,5 +26,6 @@ in
   repowise-nix-tooling = call ./repowise-nix-tooling.nix;
   agentmemory-service-config = call ./agentmemory-service-config.nix;
   netdata-service-config = call ./netdata-service-config.nix;
+  cliproxyapi-gateway-service-config = call ./cliproxyapi-gateway-service-config.nix;
   hindsight-service-config = call ./hindsight-service-config.nix;
 }

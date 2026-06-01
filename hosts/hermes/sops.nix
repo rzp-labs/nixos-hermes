@@ -37,15 +37,15 @@
       mode = "0400";
     };
 
-    # API key for the LAN CLIProxyAPI endpoint used by local OpenAI-compatible
-    # LLM providers. The key is consumed at runtime by managed services, not
-    # written into the Nix store.
+    # Client API key for local CLIProxyAPI consumers and compatibility shims.
+    # The key is consumed at runtime by managed services, not written into the
+    # Nix store.
     cliproxyapi-key = {
       sopsFile = ./secrets/cliproxyapi-key.enc;
       format = "binary";
-      owner = "agentmemory";
+      owner = "admin";
       group = "agentmemory";
-      mode = "0400";
+      mode = "0440";
     };
 
     # Agent personality — encrypted so contents remain private in the public repo.

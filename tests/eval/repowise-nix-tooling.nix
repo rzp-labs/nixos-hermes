@@ -43,9 +43,9 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   for tool in vp node npm npx vpx vpr; do
     test "$(readlink "$vp_home/.vite-plus/bin/$tool")" = '${hostPkgs.vite-plus}/bin/vp'
   done
-  test '${hostPkgs.llm-agents.cli-proxy-api.version}' = '7.1.20'
+  test '${hostPkgs.llm-agents.cli-proxy-api.version}' = '7.1.32'
   test -x '${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api'
-  ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.20'
+  ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.32'
   test -f '${../../packages/repowise-nix/flake.nix}'
   test -f '${../../packages/repowise-nix/patches/repowise-nix-language-support.patch}'
   grep -q -- 'inputs.repowise-nix.packages' '${../../modules/packages.nix}'
