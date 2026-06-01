@@ -16,6 +16,7 @@ let
 
   brokerUrl = "http://${bindHost}:${toString brokerPort}";
   gatewayBaseUrl = "http://${bindHost}:${toString gatewayPort}/v1";
+  cliProxyApiBaseUrl = "http://${bindHost}:8317/v1";
 
   adminXdgEnvironment = {
     HOME = adminHome;
@@ -64,22 +65,31 @@ in
   services.hermes-agent = {
     settings = {
       model = {
-        # Route Hermes through OMP's loopback auth-gateway so OMP owns OAuth
-        # refresh and provider-specific Codex request shaping. Do not use the
-        # Hermes openai-codex provider here: Hermes 0.14 resolves that provider
-        # through its own ChatGPT OAuth credential pool and ignores model.base_url.
-        provider = "custom";
+        # Route Hermes through the CLIProxyAPI loopback gateway for the primary
+        # Codex Responses path. Use a named custom provider so Hermes reads the
+        # configured API key; bare provider=custom falls back to no-key-required
+        # on loopback endpoints, which CLIProxyAPI correctly rejects.
+        provider = "custom:cliproxyapi";
         default = "gpt-5.5";
-        base_url = gatewayBaseUrl;
+        base_url = cliProxyApiBaseUrl;
         api_mode = "codex_responses";
         openai_runtime = "auto";
       };
 
+      custom_providers = [
+        {
+          name = "cliproxyapi";
+          base_url = cliProxyApiBaseUrl;
+          api_key = "\${CLIPROXYAPI_KEY}";
+          api_mode = "codex_responses";
+          model = "gpt-5.5";
+        }
+      ];
+
       fallback_model = {
-        # Keep fallback behind the same local gateway, but route it to a
-        # different upstream provider/model so OpenAI OAuth exhaustion does not
-        # take out both primary and failover. Clear api_mode here so Hermes
-        # does not reuse the primary Codex Responses shaping for Antigravity.
+        # Keep OMP auth-gateway as the fallback while CLIProxyAPI is promoted to
+        # primary. Clear api_mode here so Hermes does not reuse the primary
+        # Codex Responses shaping for the Antigravity/Gemini fallback route.
         provider = "custom";
         base_url = gatewayBaseUrl;
         model = "gemini-3-flash-agent:high";
