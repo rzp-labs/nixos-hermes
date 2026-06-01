@@ -1,9 +1,5 @@
 # Host-local CLIProxyAPI sidecar gateway for Hermes inference migration.
-{
-  config,
-  pkgs,
-  ...
-}:
+{ pkgs, ... }:
 
 let
   port = 8317;
@@ -17,7 +13,6 @@ let
     host = bindHost;
     inherit port;
     auth-dir = "${adminHome}/.cli-proxy-api";
-    api-keys = [ ];
     debug = false;
     logging-to-file = false;
     usage-statistics-enabled = false;
@@ -39,11 +34,9 @@ in
     description = "CLIProxyAPI loopback gateway";
     after = [
       "network-online.target"
-      "sops-nix.service"
     ];
     wants = [
       "network-online.target"
-      "sops-nix.service"
     ];
     wantedBy = [ "multi-user.target" ];
 
@@ -69,12 +62,7 @@ in
       Type = "simple";
       User = "admin";
       WorkingDirectory = adminHome;
-      ExecStartPre = pkgs.writeShellScript "cliproxyapi-gateway-render-config" ''
-        set -eu
-        API_KEY=$(cat ${config.sops.secrets.cliproxyapi-key.path})
-        export API_KEY
-        ${pkgs.yq-go}/bin/yq eval '.api-keys = [strenv(API_KEY)]' ${configFile} > ${runtimeConfig}
-      '';
+      ExecStartPre = "${pkgs.coreutils}/bin/install -m 0600 -o admin -g users ${configFile} ${runtimeConfig}";
       ExecStart = "${pkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api -config ${runtimeConfig} -local-model";
       ExecStartPost = "${pkgs.curl}/bin/curl --retry 30 --retry-delay 1 --retry-connrefused -fsS ${rootUrl}/healthz";
       Restart = "on-failure";

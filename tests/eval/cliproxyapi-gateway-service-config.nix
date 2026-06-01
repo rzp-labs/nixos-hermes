@@ -22,7 +22,6 @@ let
     map toString (pkgs.lib.toList service.ExecStartPost)
   );
   configPath = "/home/admin/.config/cli-proxy-api/config.yaml";
-  sopsSecret = hostConfig.sops.secrets.cliproxyapi-key;
 in
 pkgs.runCommand "cliproxyapi-gateway-service-config" { } ''
   set -eu
@@ -43,13 +42,7 @@ pkgs.runCommand "cliproxyapi-gateway-service-config" { } ''
   grep -q -- 'network-online.target' <<'EOF'
   ${builtins.concatStringsSep "\n" after}
   EOF
-  grep -q -- 'sops-nix.service' <<'EOF'
-  ${builtins.concatStringsSep "\n" after}
-  EOF
   grep -q -- 'network-online.target' <<'EOF'
-  ${builtins.concatStringsSep "\n" wants}
-  EOF
-  grep -q -- 'sops-nix.service' <<'EOF'
   ${builtins.concatStringsSep "\n" wants}
   EOF
 
@@ -66,12 +59,22 @@ pkgs.runCommand "cliproxyapi-gateway-service-config" { } ''
   ${builtins.concatStringsSep "\n" tmpfilesRules}
   EOF
 
-  test -x '${execStartPre}'
-  grep -q -- '${sopsSecret.path}' '${execStartPre}'
-  grep -q -- '${hostPkgs.yq-go}/bin/yq eval' '${execStartPre}'
-  grep -q -- 'strenv(API_KEY)' '${execStartPre}'
-  grep -q -- 'cliproxyapi-config.yaml' '${execStartPre}'
-  grep -q -- '${configPath}' '${execStartPre}'
+  grep -q -- '${hostPkgs.coreutils}/bin/install -m 0600 -o admin -g users' <<'EOF'
+  ${execStartPre}
+  EOF
+  grep -q -- 'cliproxyapi-config.yaml' <<'EOF'
+  ${execStartPre}
+  EOF
+  grep -q -- '${configPath}' <<'EOF'
+  ${execStartPre}
+  EOF
+  if grep -q -- 'api-keys\|cliproxyapi-key\|strenv(API_KEY)\|yq eval' <<'EOF'
+  ${execStartPre}
+  EOF
+  then
+    echo 'cliproxyapi-gateway should omit local client auth configuration' >&2
+    exit 1
+  fi
 
   test '${execStart}' = '${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api -config ${configPath} -local-model'
   grep -q -- '${hostPkgs.curl}/bin/curl --retry 30 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:8317/healthz' <<'EOF'
@@ -90,11 +93,6 @@ pkgs.runCommand "cliproxyapi-gateway-service-config" { } ''
     echo 'cliproxyapi-gateway should not restart on deleted helper package output' >&2
     exit 1
   fi
-
-  test '${sopsSecret.sopsFile}' = '${../../hosts/hermes/secrets/cliproxyapi-key.enc}'
-  test '${sopsSecret.owner}' = 'admin'
-  test '${sopsSecret.group}' = 'agentmemory'
-  test '${sopsSecret.mode}' = '0440'
 
   touch $out
 ''
