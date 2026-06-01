@@ -44,32 +44,22 @@ Upstream Agent Memory and the bundled `iii-config.yaml` bind REST/streams/viewer
 
 ## LLM provider contract
 
-Agent Memory uses an OpenAI-compatible chat provider through CLIProxyAPI:
+Agent Memory uses an OpenAI-compatible chat provider through the local OMP auth gateway:
 
 ```env
-OPENAI_BASE_URL=http://10.0.0.102:8317
+OPENAI_BASE_URL=http://127.0.0.1:4000
 OPENAI_MODEL=gpt-5.4-mini
 AGENTMEMORY_LLM_TIMEOUT_MS=120000
 OPENAI_TIMEOUT_MS=120000
 EMBEDDING_PROVIDER=local
 ```
 
-Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the proxy root (`http://10.0.0.102:8317`), not `http://10.0.0.102:8317/v1`.
+Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the proxy root (`http://127.0.0.1:4000`), not `http://127.0.0.1:4000/v1`.
 
-The CLIProxyAPI key is a raw SOPS secret shared by local managed services that
-need to call the OpenAI-compatible proxy. The current host-local ownership is:
-
-```nix
-sops.secrets.cliproxyapi-key = {
-  owner = "admin";
-  group = "agentmemory";
-  mode = "0440";
-};
-```
-
-Agent Memory's startup wrapper waits briefly for `/run/secrets/cliproxyapi-key`,
-reads it inside the service process, and exports `OPENAI_API_KEY` there. Do not
-put this key in Nix store-backed environment files or generated config.
+Agent Memory no longer reads the CLIProxyAPI key directly. Its startup wrapper
+sets `OPENAI_API_KEY=local-auth-gateway` as a sentinel because the OMP loopback
+auth gateway runs with `--no-auth`. Do not put real API keys in Nix store-backed
+environment files or generated config.
 
 Service-specific credential handling may still use `LoadCredential` when that
 service has been validated with its own activation/restart shape. For example,
