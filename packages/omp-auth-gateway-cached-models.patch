@@ -1,0 +1,33 @@
+diff --git a/packages/coding-agent/src/cli/auth-gateway-cli.ts b/packages/coding-agent/src/cli/auth-gateway-cli.ts
+--- a/packages/coding-agent/src/cli/auth-gateway-cli.ts
++++ b/packages/coding-agent/src/cli/auth-gateway-cli.ts
+@@ -29,6 +29,7 @@ import {
+ 	getBundledProviders,
+ 	type Model,
+ 	RemoteAuthCredentialStore,
++	readModelCache,
+ 	type SnapshotResponse,
+ 	startAuthGateway,
+ } from "@oh-my-pi/pi-ai";
+@@ -167,7 +168,9 @@ async function serveGateway(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
+ 	// Build the model resolver + catalog from pi-ai's bundled metadata, scoped
+ 	// to providers we hold credentials for. Format handlers ask `resolveModel`
+ 	// to translate a client-requested `model` field into a pi-ai `Model<Api>`
+-	// before dispatch; `listModels` powers `/v1/models`.
++	// before dispatch; `listModels` powers `/v1/models`. Merge cached dynamic
++	// models too: interactive OMP can use provider-discovered model ids that are
++	// absent from bundled metadata, and the gateway should accept the same ids.
+ 	const snapshot = storage.exportSnapshot();
+ 	const providersWithCreds = new Set<string>();
+ 	for (const entry of snapshot.credentials) providersWithCreds.add(entry.provider);
+@@ -179,6 +182,10 @@ async function serveGateway(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
+ 			// stick to the provider listed first by getBundledProviders.
+ 			if (!modelById.has(model.id)) modelById.set(model.id, model);
+ 		}
++		const cache = readModelCache<Api>(provider, Number.POSITIVE_INFINITY, Date.now);
++		for (const model of cache?.models ?? []) {
++			if (!modelById.has(model.id)) modelById.set(model.id, model);
++		}
+ 	}
+ 
+ 	const handle = startAuthGateway({
