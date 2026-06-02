@@ -72,6 +72,8 @@ nixos-hermes/
 
 - Module function heads use named args: `{ config, pkgs, lib, ... }:`
 - One logical concern per file; do not conflate hardware and service config.
+- Keep substantial shell/Python out of inline Nix strings. If runtime glue is more than a tiny command, put it in a dedicated package/script file so it can be formatted, linted, typechecked, reviewed, and tracked independently.
+- Do not bundle independent services into one module just because they are adjacent in the migration path; each service gets its own `.nix` owner unless there is a real shared abstraction.
 - Comments explain *why*, not *what* the code already says.
 - Prefer `lib.mkDefault` only at genuine override boundaries; omit where the value is unconditional.
 

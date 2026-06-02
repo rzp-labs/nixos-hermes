@@ -13,3 +13,5 @@ ndMcpBridge = "ndMcpBridge"
 [default.extend-words]
 # Netdata's MCP bridge package path uses the upstream abbreviation "nd".
 nd = "nd"
+# Den's public API uses `den.ful.<namespace>` for reusable aspect libraries.
+ful = "ful"
