@@ -17,10 +17,11 @@ let
 in
 pkgs.runCommand "hermes-runtime-packaging" { } ''
                 set -eu
-                test '${hermesPackage.version}' = '0.15.0'
+                test '${hermesPackage.version}' = '0.15.2'
                 PYTHONPATH='${hostPkgs.opusCtypesShim}' '${hermesPackage.passthru.hermesVenv}/bin/python3' - <<'PY'
   import ctypes.util
   import importlib.util
+  from pathlib import Path
 
   missing = [
       name
@@ -29,6 +30,15 @@ pkgs.runCommand "hermes-runtime-packaging" { } ''
   ]
   if missing:
       raise SystemExit(f"missing runtime imports: {missing}")
+
+  plugins_spec = importlib.util.find_spec("plugins")
+  if plugins_spec is None or not plugins_spec.submodule_search_locations:
+      raise SystemExit("missing bundled plugins package")
+  plugin_roots = [Path(p) for p in plugins_spec.submodule_search_locations]
+  manifests = [m for root in plugin_roots for m in root.rglob("plugin.y*ml")]
+  if not manifests:
+      raise SystemExit(f"bundled plugin manifests missing from sealed runtime: {plugin_roots}")
+
   opus = ctypes.util.find_library("opus")
   if not opus or "libopus.so" not in opus:
       raise SystemExit(f"opus shim did not resolve libopus: {opus!r}")

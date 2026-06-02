@@ -20,7 +20,7 @@
     # Pin Hermes Agent to maintainer-cut releases instead of default-branch
     # trunk. Upstream moves fast enough that unreleased commits deserve their
     # own validation branch, not a routine package refresh.
-    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.28";
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.29.2";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     llm-agents.url = "github:numtide/llm-agents.nix";
     # Keep GitButler on a separately validated llm-agents revision while allowing

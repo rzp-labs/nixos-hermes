@@ -25,7 +25,7 @@ let
   # i18n loader at the same locked source revision so gateway slash commands do
   # not render raw keys such as gateway.resume.list_header.
   #
-  # Hermes 0.15.0's pyproject still includes only `hermes_cli`, not
+  # Hermes 0.15.x's pyproject still includes only `hermes_cli`, not
   # `hermes_cli.*`, so uv2nix omits the new `hermes_cli.proxy` subpackage from
   # the sealed environment. Extend the installed package path to the locked
   # source tree instead of patching generated/bundled output.
