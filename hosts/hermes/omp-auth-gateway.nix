@@ -82,7 +82,7 @@ in
         # does not reuse the primary Codex Responses shaping for Antigravity.
         provider = "custom";
         base_url = gatewayBaseUrl;
-        model = "gemini-3-flash-agent:high";
+        model = "gemini-3-flash-agent";
         api_mode = "";
       };
 
@@ -92,7 +92,7 @@ in
         # smoke gateway routing independently from the controller model.
         provider = "custom";
         base_url = gatewayBaseUrl;
-        model = "gemini-3-flash-agent:high";
+        model = "gemini-3-flash-agent";
         api_key = "local-auth-gateway";
         api_mode = "";
       };
