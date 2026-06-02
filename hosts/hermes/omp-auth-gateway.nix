@@ -85,6 +85,17 @@ in
         model = "gemini-3-flash-agent:high";
         api_mode = "";
       };
+
+      delegation = {
+        # Run subagents through the same admin-owned OMP auth gateway as the
+        # main Hermes model, but on the Antigravity model lane. This lets us
+        # smoke gateway routing independently from the controller model.
+        provider = "custom";
+        base_url = gatewayBaseUrl;
+        model = "gemini-3-flash-agent:high";
+        api_key = "local-auth-gateway";
+        api_mode = "";
+      };
     };
   };
 

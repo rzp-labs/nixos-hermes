@@ -284,7 +284,10 @@ in
               # and generated assets, then run the TypeScript entrypoint with Bun.
               autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
 
-              patches = (oldAttrs.patches or [ ]) ++ [ ../packages/omp-auth-gateway-tool-call-id.patch ];
+              patches = (oldAttrs.patches or [ ]) ++ [
+                ../packages/omp-auth-gateway-tool-call-id.patch
+                ../packages/omp-auth-gateway-cached-models.patch
+              ];
 
               buildPhase = ''
                 runHook preBuild
