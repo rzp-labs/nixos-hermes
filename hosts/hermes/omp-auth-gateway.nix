@@ -95,7 +95,6 @@ in
         model = "gemini-3-flash-agent:high";
         api_key = "local-auth-gateway";
         api_mode = "";
-        reasoning_effort = "high";
       };
     };
   };
