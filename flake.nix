@@ -116,7 +116,13 @@
             if system == "x86_64-linux" then
               let
                 vmTests = pkgs.callPackage ./tests {
-                  inherit nixpkgs sops-nix hermes-agent;
+                  inherit
+                    nixpkgs
+                    sops-nix
+                    hermes-agent
+                    home-manager
+                    ;
+                  denModel = self.denModel;
                 };
                 evalChecks = import ./tests/eval {
                   inherit pkgs;
@@ -126,10 +132,11 @@
               in
               {
                 # VM tests — QEMU only available on Linux.
-                # See AGENTS.md for the testing ladder — use VM tests only for
-                # activation script changes.
+                # See AGENTS.md for the testing ladder — use VM tests when a
+                # build/eval cannot prove activation or runtime-shaped behavior.
                 inherit (vmTests)
                   activation-github-auth
+                  den-host-vm-smoke
                   vm-switch-smoke
                   ;
               }

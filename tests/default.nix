@@ -11,6 +11,8 @@
   nixpkgs,
   sops-nix,
   hermes-agent,
+  home-manager,
+  denModel,
 }:
 
 let
@@ -93,8 +95,106 @@ let
     ];
   };
 
+  denHost = denModel.den.hosts.x86_64-linux.nixos-hermes;
+  denAdmin = denHost.users.admin;
+  denHermes = denHost.users.hermes;
+  denPoc = denHost.users.den-poc;
+
+  denHostVmModule =
+    { lib, ... }:
+    {
+      imports = [ home-manager.nixosModules.home-manager ];
+
+      networking.hostName = denHost.name;
+      system.stateVersion = denHost.stateVersion;
+      services.openssh.enable = true;
+
+      users.mutableUsers = false;
+      # The real host creates some groups via imported service modules. This
+      # VM harness declares Den-modeled group targets directly so user-shape
+      # assertions remain independent from unrelated service migrations.
+      users.groups.networkmanager = { };
+      users.users.admin = {
+        isNormalUser = denAdmin.normalUser;
+        home = lib.mkIf (denAdmin.home != null) denAdmin.home;
+        createHome = lib.mkIf (denAdmin.createHome != null) denAdmin.createHome;
+        homeMode = lib.mkIf (denAdmin.homeMode != null) denAdmin.homeMode;
+        extraGroups = denAdmin.extraGroups;
+        openssh.authorizedKeys.keys = lib.mkIf denAdmin.sshAuthorizedKeysConfigured [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDenVmAdminKeyForShapeOnly000000000000000000"
+        ];
+      };
+      users.groups.hermes = { };
+      users.users.hermes = {
+        isSystemUser = true;
+        group = "hermes";
+        openssh.authorizedKeys.keys = lib.mkIf denHermes.sshAuthorizedKeysConfigured [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDenVmHermesKeyForShapeOnly00000000000000000"
+        ];
+      };
+      users.users.den-poc = {
+        isNormalUser = denPoc.normalUser;
+        home = lib.mkIf (denPoc.home != null) denPoc.home;
+        createHome = lib.mkIf (denPoc.createHome != null) denPoc.createHome;
+      };
+
+      security.sudo.wheelNeedsPassword = false;
+      home-manager.useGlobalPkgs = true;
+      home-manager.useUserPackages = true;
+      home-manager.users.admin = lib.mkIf denAdmin.hasHomeManagerConfig {
+        home.stateVersion = denHost.stateVersion;
+      };
+      home-manager.users.hermes = lib.mkIf denHermes.hasHomeManagerConfig {
+        home.stateVersion = denHost.stateVersion;
+      };
+      home-manager.users.den-poc = lib.mkIf denPoc.hasHomeManagerConfig {
+        imports = [
+          ((builtins.elemAt denModel.den.aspects.den-poc.homeManager.__contentValues 0).value {
+            inherit pkgs;
+          })
+          # Native Home Manager config deliberately remains alongside the
+          # Den-rendered module for the same user. This proves per-user
+          # incremental migration, not just different users on different paths.
+          {
+            home.packages = [ pkgs.bat ];
+          }
+        ];
+      };
+    };
+
 in
 {
+  # Test: build a VM from the Den-modeled host/user facts. This is the
+  # iteration harness for Den refactors: when a host module is migrated into a
+  # Den aspect, add its VM-safe assertions here before using the live host.
+  den-host-vm-smoke = pkgs.testers.runNixOSTest {
+    name = "den-host-vm-smoke";
+
+    nodes.machine = denHostVmModule;
+
+    testScript = ''
+      machine.wait_for_unit("multi-user.target")
+      machine.succeed("hostname | grep -qx nixos-hermes")
+      machine.succeed("getent passwd admin >/dev/null")
+      machine.succeed("getent passwd hermes >/dev/null")
+      machine.succeed("getent passwd den-poc >/dev/null")
+      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx wheel")
+      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx networkmanager")
+      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx hermes")
+      machine.succeed("test -d /home/admin")
+      machine.succeed("stat -c%a /home/admin | grep -qx 700")
+      machine.succeed("test -f /etc/ssh/authorized_keys.d/admin")
+      machine.succeed("test -f /etc/ssh/authorized_keys.d/hermes")
+      machine.succeed("test -L /etc/profiles/per-user/admin")
+      machine.succeed("test -L /etc/profiles/per-user/hermes")
+      machine.succeed("test -L /etc/profiles/per-user/den-poc")
+      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/glow")
+      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/bat")
+      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/glow --version")
+      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/bat --version")
+    '';
+  };
+
   # Test: switch to a prebuilt target inside a guest and verify an
   # activation-visible change. This catches changes that build cleanly but
   # only fail when switch-to-configuration runs, without depending on guest

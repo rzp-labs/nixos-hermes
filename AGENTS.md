@@ -158,14 +158,17 @@ For local flake `nixos-rebuild test` validation, use a clean repo copy at `/home
 The VM tests live under `tests/` and run via QEMU — no root needed.
 Pure-evaluation assertion checks (no guest boot) live under `tests/eval/`;
 both surface through the flake `checks.x86_64-linux.*` output.
-`checks.x86_64-linux.vm-switch-smoke` is the heaviest repo-owned smoke:
-it boots a VM, switches to a prebuilt target system inside the guest with
-`switch-to-configuration switch`, and verifies `/etc` plus
-`/run/current-system` moved. Use it when build/dry-activate proof is not
-enough for activation or switch-time behavior. It intentionally does not
+`checks.x86_64-linux.den-host-vm-smoke` boots a VM built from the
+Den-modeled host/user facts and is the iteration harness for Den refactors:
+when a host module is migrated into a Den aspect, add VM-safe assertions there
+before using the live host as evidence. `checks.x86_64-linux.vm-switch-smoke`
+is the heaviest repo-owned smoke: it boots a VM, switches to a prebuilt target
+system inside the guest with `switch-to-configuration switch`, and verifies
+`/etc` plus `/run/current-system` moved. Use it when build/dry-activate proof
+is not enough for activation or switch-time behavior. It intentionally does not
 exercise guest-side `nixos-rebuild` flake evaluation or network/cache access.
-VM tests are the right tool when activation scripts change, but may also
-be valuable for other changes where the build alone is insufficient.
+VM tests are the right tool when activation scripts change, Den-rendered
+behavior changes, or other build-only proof is insufficient.
 Use judgment — the table above is guidance, not a hard constraint.
 `dry-activate` runs `switch-to-configuration dry-activate` to diff
 systemd units without applying changes — needs root but does not

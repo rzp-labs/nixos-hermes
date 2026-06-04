@@ -64,9 +64,26 @@
       sshAuthorizedKeysConfigured = true;
       classes = [ "homeManager" ];
     };
+
+    # VM-only Den/Home Manager rendering fixture. This is not production
+    # inventory; it proves Den can render Home Manager package config in the
+    # QEMU harness before moving real admin tools.
+    users.den-poc = {
+      normalUser = true;
+      hasHomeManagerConfig = true;
+      home = "/home/den-poc";
+      createHome = true;
+      classes = [ "homeManager" ];
+    };
   };
 
   den.aspects.nixos-hermes.includes = [ ];
   den.aspects.admin.includes = [ ];
   den.aspects.hermes.includes = [ ];
+  den.aspects.den-poc.homeManager =
+    { pkgs, ... }:
+    {
+      home.stateVersion = "25.05";
+      home.packages = [ pkgs.glow ];
+    };
 }
