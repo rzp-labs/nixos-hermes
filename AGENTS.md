@@ -22,6 +22,11 @@ nixos-hermes/
 │   │   ├── netdata-service-config.nix   # Netdata config + observe wrapper + MCP wiring
 │   │   └── hindsight-service-config.nix # asserts Hindsight memory stays disabled
 │   └── default.nix                      # nixosTest VM test suite
+├── den/                                 # eval-only Den model surface (not deployment output)
+│   ├── default.nix                      # Den model module entrypoint
+│   ├── schema.nix                       # repo-local host/user schema facts
+│   ├── entities.nix                     # nixos-hermes/admin/hermes inventory facts
+│   └── lab.nix                          # local lab namespace/category skeleton
 ├── checks/
 │   └── pre-commit.nix                   # git-hooks.nix hook config (dev shell + pre-commit-check)
 ├── apps/
@@ -243,11 +248,38 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 - `tests/eval/default.nix` is the aggregator: it takes the evaluated
   `hostSystem` once and feeds `config`/`pkgs` into each check, then surfaces them
   through `flake.nix`'s `checks.x86_64-linux.*` output.
+- Checks that assert on the eval-only Den model may additionally take `denModel`;
+  they must not imply the Den model is the deployment output.
 - These are evaluation/build checks, **not** VM tests — they sit alongside the VM
   suite in `tests/` but never boot a guest. Run one with
   `nix build .#checks.x86_64-linux.<name>`.
 - Path literals inside a check resolve relative to the file, so reference repo
   paths as `../../packages/...`, `../../hosts/...`, etc. — not `./...`.
+
+### `den/`
+
+*Eval-only Den model surface for the homelab graph.*
+
+- Reviewers new to Den should start with `docs/guides/DEN_REVIEW_GUIDE.md`;
+  keep that guide source-controlled and updated as Den becomes the repo shape.
+- This is a planning/modeling surface, not the live host deployment output.
+  `nixosConfigurations.nixos-hermes` remains the source of truth for host
+  deployment until a later milestone deliberately changes that boundary.
+- `schema.nix` owns repo-local host/user vocabulary mirrored from current code,
+  such as imported module paths, service-module lists, `stateVersion`,
+  `nixpkgsHostPlatform`, user homes, groups, Home Manager presence, and SSH-key
+  configuration presence. Do not add aspirational/persona fields here unless an
+  existing source file already encodes that fact.
+- `entities.nix` owns current repo-safe inventory facts for `nixos-hermes`,
+  `admin`, and `hermes`. Keep these inventory-like and source-grounded; do not
+  hide large NixOS or Home Manager modules here.
+- `lab.nix` owns the local `lab` namespace/category skeleton. Reusable behavior
+  should later land under `lab.platform`, `lab.features`, `lab.workloads`,
+  `lab.hardware`, `lab.users`, or `lab.quirks`; concrete host/user aspects should
+  stay thin composition points.
+- Do not add custom fleet/environment topology, quirks that drive production
+  config, or host-service migrations here without a follow-up issue and eval
+  proof. First-slice Den work uses the default host/home traversal policies.
 
 ### `checks/pre-commit.nix`
 

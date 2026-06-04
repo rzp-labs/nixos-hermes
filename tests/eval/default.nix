@@ -15,11 +15,22 @@
 {
   pkgs,
   hostSystem,
+  denModel,
 }:
 let
   hostConfig = hostSystem.config;
   hostPkgs = hostSystem.pkgs;
   call = f: import f { inherit pkgs hostConfig hostPkgs; };
+  callDen =
+    f:
+    import f {
+      inherit
+        pkgs
+        hostConfig
+        hostPkgs
+        denModel
+        ;
+    };
 in
 {
   hermes-runtime-packaging = call ./hermes-runtime-packaging.nix;
@@ -27,4 +38,5 @@ in
   agentmemory-service-config = call ./agentmemory-service-config.nix;
   netdata-service-config = call ./netdata-service-config.nix;
   hindsight-service-config = call ./hindsight-service-config.nix;
+  den-model-surface = callDen ./den-model-surface.nix;
 }

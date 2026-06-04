@@ -2,6 +2,8 @@
 
 Review basis: Den `v0.17.0` / `latest` at `8f1a59448043677ac8bc7854348c1b8ee6889c0b`, released 2026-05-21. This document describes the target homelab model against Den 0.17.0 semantics, not the older pre-effect-core architecture.
 
+Reviewer entrypoint: if you are comfortable with Nix but new to Den, start with `docs/guides/DEN_REVIEW_GUIDE.md`. This architecture document explains the target model; the review guide explains how to assess Den-shaped changes in this repo.
+
 Den owns the shape of the infrastructure model. The homelab is a semantic graph: typed entities describe what exists, aspects describe behavior, policies describe topology and output routing, and quirks/pipes move structured operational data between scopes. Host files are inventory, not implementation dumps.
 
 ## Den 0.17.0 Model

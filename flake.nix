@@ -30,6 +30,8 @@
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
     repowise-nix.inputs.nixpkgs.follows = "nixpkgs";
+    den.url = "github:denful/den/v0.17.0";
+    import-tree.url = "github:vic/import-tree";
   };
 
   outputs =
@@ -119,6 +121,7 @@
                 evalChecks = import ./tests/eval {
                   inherit pkgs;
                   hostSystem = self.nixosConfigurations.nixos-hermes;
+                  denModel = self.denModel;
                 };
               in
               {
@@ -151,5 +154,13 @@
           pkgs = nixpkgs.legacyPackages.${system};
         }
       );
+
+      # Eval-only Den model surface. This is not the deployment output;
+      # nixosConfigurations.nixos-hermes above remains the host source of truth.
+      denModel =
+        (nixpkgs.lib.evalModules {
+          modules = [ ./den ];
+          specialArgs = { inherit inputs; };
+        }).config;
     };
 }
