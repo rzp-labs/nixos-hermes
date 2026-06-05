@@ -84,9 +84,9 @@ nixos-hermes/
 ### Secrets
 
 - **Never commit plaintext secrets.** `.secrets/` is `.gitignore`d; it exists only for local templating.
-- The committed encrypted secrets live under `hosts/hermes/secrets/`.
+- The committed encrypted secrets live under `den/hosts/nixos-hermes/secrets/payload/`.
 - The `sops age` key is `/etc/secrets/age.key` on the host. The corresponding public key is registered in `.sops.yaml`. Do not change the public key in `.sops.yaml` without re-encrypting every secret file.
-- `.secrets/hermes-secrets.yaml` is the plaintext template (`gitignored`). Workflow: edit locally → `sops --encrypt .secrets/hermes-secrets.yaml > hosts/hermes/secrets/hermes-secrets.yaml` → commit the encrypted file → never commit the plaintext.
+- `.secrets/hermes-secrets.yaml` is the plaintext template (`gitignored`). Workflow: edit locally → `sops --encrypt .secrets/hermes-secrets.yaml > den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml` → commit the encrypted file → never commit the plaintext.
 - When adding a new secret key: add it to `.secrets/hermes-secrets.yaml`, add the `sops.secrets.<name>` binding in `den/hosts/nixos-hermes/secrets/sops.nix`, then re-encrypt.
 
 ### Users

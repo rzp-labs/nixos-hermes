@@ -1,9 +1,9 @@
 [files]
 # .gitignore uses glob character-class patterns like [Ii]nclude, [Ss]cripts
 # that typos incorrectly flags as misspellings.
-# hosts/hermes/secrets/ and tests/assets/ contain SOPS ciphertext which
+# den/hosts/nixos-hermes/secrets/payload/ and tests/assets/ contain SOPS ciphertext which
 # triggers false positives on random byte sequences in base64.
-extend-exclude = [".gitignore", "hosts/hermes/secrets/", "tests/assets/", "assets/"]
+extend-exclude = [".gitignore", "den/hosts/nixos-hermes/secrets/payload/", "tests/assets/", "assets/"]
 
 [default.extend-identifiers]
 # Netdata's MCP bridge package path uses the upstream abbreviation "nd".

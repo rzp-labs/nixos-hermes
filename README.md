@@ -52,7 +52,7 @@ driven from `den/hosts/nixos-hermes/storage/disk-config.nix` via the
 Secrets are managed with [sops-nix](https://github.com/Mic92/sops-nix) and
 [age](https://github.com/FiloSottile/age). The age host key lives at
 `/etc/secrets/age.key` (generated once, placed manually during bootstrap).
-Encrypted secrets live under `hosts/hermes/secrets/` and are decrypted at activation
+Encrypted secrets live under `den/hosts/nixos-hermes/secrets/payload/` and are decrypted at activation
 time.
 
 ### Hermes Agent

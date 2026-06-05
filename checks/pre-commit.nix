@@ -42,7 +42,7 @@ git-hooks.lib.${system}.run {
             allow-non-breakable-words: true
             level: warning
         ignore: |
-          hosts/hermes/secrets/
+          den/hosts/nixos-hermes/secrets/payload/
           tests/assets/
       '';
     };
