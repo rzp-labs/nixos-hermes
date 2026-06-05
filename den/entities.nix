@@ -603,10 +603,6 @@ in
       pkgs,
       modulesPath,
       config,
-      inputs,
-      nixpkgs-llama,
-      llm-agents,
-      llm-agents-gitbutler,
       ...
     }:
     let
@@ -754,9 +750,11 @@ in
             # API keys merged into $HERMES_HOME/.env at activation.
             # Current keys include Discord/ElevenLabs/OpenRouter/Linear/GitHub plus scoped
             # tool credentials such as GEMINI_API_KEY and REPOWISE_OPENAI_*.
-            environmentFiles = builtins.map (
-              name: config.sops.secrets.${name}.path
-            ) host.services.hermesAgent.environmentSecretNames;
+            environmentFiles = builtins.map (name: config.sops.secrets.${name}.path) (
+              builtins.filter (
+                name: builtins.hasAttr name config.sops.secrets
+              ) host.services.hermesAgent.environmentSecretNames
+            );
 
             settings = {
               model = {
@@ -990,13 +988,12 @@ in
         {
           config,
           lib,
-          nixpkgs-llama,
           pkgs,
           ...
         }:
 
         let
-          netdataPackageBase = nixpkgs-llama.legacyPackages.${pkgs.stdenv.hostPlatform.system}.netdata;
+          netdataPackageBase = inputs.nixpkgs-llama.legacyPackages.${pkgs.stdenv.hostPlatform.system}.netdata;
 
           # Netdata Cloud currently requires 2.10.3 for security fixes, while both the
           # primary FlakeHub nixpkgs input and nixpkgs-llama still package older agents.
@@ -1379,6 +1376,9 @@ in
               # exploration works without exposing the local dashboard beyond loopback.
               "systemd-journal"
             ];
+            ExecStartPost = [ "${netdataWaitForApi}" ];
+          }
+          // lib.optionalAttrs (config.sops.secrets ? "netdata-claim-conf") {
             LoadCredential = [
               "netdata_claim_conf:${config.sops.secrets.netdata-claim-conf.path}"
             ];
@@ -1853,7 +1853,7 @@ in
             };
           };
 
-          systemd.services = {
+          systemd.services = lib.mkIf (config.sops.secrets ? "omp-auth-broker-token") {
             omp-auth-broker = {
               description = "OMP OAuth auth broker";
               after = [
@@ -2369,16 +2369,16 @@ in
 
       # Allow specific unfree packages needed by the host while letting NixOS VM
       # tests keep nixpkgs' read-only defaults.
-      nixpkgs.config.allowUnfreePredicate = lib.mkDefault (
-        pkg: builtins.elem (lib.getName pkg) host.nixpkgs.allowedUnfree
-      );
+      nixpkgs.config = lib.mkDefault {
+        allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) host.nixpkgs.allowedUnfree;
+      };
 
-      nixpkgs.overlays = [
+      nixpkgs.overlays = lib.mkDefault [
         # llm-agents.nix provides claude-code, codex, omp, agent-browser, and many more.
         # Use the default overlay for the fast-moving main input so npm packages build
         # with llm-agents' own compatible nixpkgs; GitButler is overridden below from
         # a separate pinned input.
-        llm-agents.overlays.default
+        inputs.llm-agents.overlays.default
         (final: prev: {
           # Exposed via overlay so consumers (hermes-agent.nix) can reference
           # pkgs.opusCtypesShim without packages.nix coupling to any service.
@@ -2539,7 +2539,7 @@ in
 
           # Primary FlakeHub nixpkgs still lags a few host-required package versions.
           # Pull narrow package overrides from nixpkgs-llama until FlakeHub catches up.
-          llamaPackageSet = nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system};
+          llamaPackageSet = inputs.nixpkgs-llama.legacyPackages.${prev.stdenv.hostPlatform.system};
           bun = final.llamaPackageSet.bun.overrideAttrs (
             oldAttrs:
             let
@@ -2562,7 +2562,7 @@ in
 
           llm-agents =
             let
-              pinnedGitButlerPackages = llm-agents-gitbutler.packages.${final.stdenv.hostPlatform.system};
+              pinnedGitButlerPackages = inputs.llm-agents-gitbutler.packages.${final.stdenv.hostPlatform.system};
             in
             prev.llm-agents
             // {
@@ -2655,7 +2655,6 @@ in
 
       networking.hostName = host.name;
       networking.hostId = host.hostId;
-      disko.devices = host.storage.diskoDevices;
       nix.settings.trusted-users = host.trustedUsers;
       system.stateVersion = host.stateVersion;
       users.mutableUsers = host.userManagement.mutableUsers;

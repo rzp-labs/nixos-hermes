@@ -80,6 +80,12 @@
             determinate.nixosModules.default
             sops-nix.nixosModules.sops
             disko.nixosModules.default
+            (
+              { ... }:
+              {
+                disko.devices = denHost.storage.diskoDevices;
+              }
+            )
             home-manager.nixosModules.home-manager
             hermes-agent.nixosModules.default
             denHost.mainModule
