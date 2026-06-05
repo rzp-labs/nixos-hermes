@@ -113,10 +113,10 @@ selected by the Den host graph in `den/entities.nix`. There is no longer a
   - `den/hosts/nixos-hermes/services/agentmemory.nix`
   - `den/hosts/nixos-hermes/services/netdata.nix`
   - `den/hosts/nixos-hermes/services/omp-auth-gateway.nix`
-  - `modules/hermes-agent.nix`
-  - `modules/hermes-plugins.nix`
+  - `den/hosts/nixos-hermes/services/hermes-agent/default.nix`
+  - `den/hosts/nixos-hermes/services/hermes-agent/plugins.nix`
 - package overlays and host package workarounds:
-  - `modules/packages.nix`
+  - `den/hosts/nixos-hermes/shared/packages.nix`
 
 ## Current module ownership
 
@@ -135,11 +135,11 @@ Owns the host module graph categories used by `flake.nix`:
 This is the current host instantiation boundary: `flake.nix` maps these Den
 paths into NixOS modules.
 
-### `modules/system.nix`
+### `den/hosts/nixos-hermes/shared/system.nix`
 
 Marker module only. Migrated baseline system settings are rendered from Den.
 
-### `modules/home-manager.nix`
+### `den/hosts/nixos-hermes/shared/home-manager.nix`
 
 Home Manager NixOS integration flags only:
 
@@ -150,7 +150,7 @@ home-manager.useUserPackages = true;
 
 User Home Manager configs are rendered from Den.
 
-### `modules/users.nix`
+### `den/hosts/nixos-hermes/shared/users.nix`
 
 Immutable-user policy and an admin workspace tmpfiles rule:
 
@@ -163,7 +163,7 @@ systemd.tmpfiles.rules = [
 
 Actual user accounts and SSH keys are rendered from Den.
 
-### `modules/packages.nix`
+### `den/hosts/nixos-hermes/shared/packages.nix`
 
 Owns overlays and package workarounds. The Den VM uses the real host `pkgs` instance from `nixosConfigurations.nixos-hermes.pkgs`, so Den-rendered package names are resolved against the same package namespace as the host.
 

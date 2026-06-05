@@ -38,12 +38,12 @@ let
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
-    "modules/hermes-agent.nix"
-    "modules/hermes-plugins.nix"
-    "modules/system.nix"
-    "modules/packages.nix"
-    "modules/home-manager.nix"
-    "modules/users.nix"
+    "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
+    "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
+    "den/hosts/nixos-hermes/shared/system.nix"
+    "den/hosts/nixos-hermes/shared/packages.nix"
+    "den/hosts/nixos-hermes/shared/home-manager.nix"
+    "den/hosts/nixos-hermes/shared/users.nix"
   ];
   expectedHardwareModules = [
     "den/hosts/nixos-hermes/hardware/default.nix"
@@ -65,14 +65,14 @@ let
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
-    "modules/hermes-agent.nix"
-    "modules/hermes-plugins.nix"
+    "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
+    "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
   expectedSharedModules = [
-    "modules/system.nix"
-    "modules/packages.nix"
-    "modules/home-manager.nix"
-    "modules/users.nix"
+    "den/hosts/nixos-hermes/shared/system.nix"
+    "den/hosts/nixos-hermes/shared/packages.nix"
+    "den/hosts/nixos-hermes/shared/home-manager.nix"
+    "den/hosts/nixos-hermes/shared/users.nix"
   ];
 in
 pkgs.runCommand "den-model-surface" { } ''

@@ -143,7 +143,7 @@ in
 
       repowise = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise;
       repowise-nix = inputs.repowise-nix.packages.${prev.stdenv.hostPlatform.system}.repowise-nix;
-      vite-plus = prev.callPackage ../packages/vite-plus { };
+      vite-plus = prev.callPackage ../../../../packages/vite-plus { };
 
       agentmemory =
         let
@@ -285,8 +285,8 @@ in
               autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
 
               patches = (oldAttrs.patches or [ ]) ++ [
-                ../packages/omp-auth-gateway-tool-call-id.patch
-                ../packages/omp-auth-gateway-cached-models.patch
+                ../../../../packages/omp-auth-gateway-tool-call-id.patch
+                ../../../../packages/omp-auth-gateway-cached-models.patch
               ];
 
               buildPhase = ''
