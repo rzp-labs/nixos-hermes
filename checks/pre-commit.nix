@@ -32,6 +32,10 @@ git-hooks.lib.${system}.run {
     # YAML validation — inline config to handle dotfile exclusion in nix sandbox
     yamllint = {
       enable = true;
+      excludes = [
+        "^den/hosts/nixos-hermes/secrets/payload/"
+        "^tests/assets/"
+      ];
       settings.configuration = ''
         extends: default
         rules:
