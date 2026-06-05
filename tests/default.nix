@@ -127,7 +127,16 @@ let
       sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
       sops.age.sshKeyPaths = lib.mkForce [ ];
       sops.defaultSopsFile = lib.mkForce testSecretsFile;
-      sops.secrets = lib.mkForce { };
+      systemd.services.sops-nix.enable = false;
+      system.activationScripts.setupSecrets = lib.mkForce "";
+
+      systemd.tmpfiles.rules = [
+        "d /run/secrets 0755 root root - -"
+        "f /run/secrets/omp-auth-broker-token 0600 admin users - dummy-token"
+        "f /run/secrets/cliproxyapi-key 0600 agentmemory agentmemory - dummy-key"
+        "f /run/secrets/netdata-claim-conf 0600 netdata netdata - dummy-claim"
+        "f /run/secrets/hermes-env 0600 hermes hermes - GITHUB_TOKEN=dummy-token"
+      ];
 
       # The general Den host VM smoke does not decrypt or seed real Hermes
       # runtime state. Provisioning scripts are covered by activation-focused
@@ -147,6 +156,17 @@ let
 
       security.sudo.wheelNeedsPassword = false;
       den.fixtures.denPoc.enable = true;
+
+      # Override docker storage driver and netdata run directory for VM compatibility
+      virtualisation.docker.storageDriver = lib.mkForce "overlay2";
+      services.netdata.config.global."run directory" = "/run/netdata";
+      systemd.services.netdata.serviceConfig.ExecStartPost = lib.mkForce [
+        (pkgs.writeShellScript "wait-for-netdata-up-vm" ''
+          until [ -S /run/netdata/ipc ] || [ -S /tmp/netdata/ipc ]; do
+            sleep 0.5
+          done
+        '')
+      ];
       home-manager.users.den-poc = lib.mkIf denPoc.hasHomeManagerConfig {
         imports = [
           # Native Home Manager config deliberately remains alongside the
@@ -193,6 +213,19 @@ in
       machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/bat")
       machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/glow --version")
       machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/bat --version")
+
+      # Sudo and Group Membership Verification
+      machine.succeed("runuser -u admin -- sudo -n true")
+      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx docker")
+      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx libvirtd")
+
+      # Service Activation Verification
+      machine.wait_for_unit("docker.service")
+      machine.wait_for_unit("libvirtd.service")
+      machine.wait_for_unit("netdata.service")
+      machine.wait_for_unit("omp-auth-gateway.service")
+      machine.wait_for_unit("agentmemory.service")
+      machine.wait_for_open_port(4000)
     '';
   };
 
