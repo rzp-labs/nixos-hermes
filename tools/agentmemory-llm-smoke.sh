@@ -89,7 +89,7 @@ started_at = os.environ["AGENTMEMORY_SMOKE_STARTED_AT"]
 stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 marker = f"agentmemory-smoke-{stamp}"
 session_id = f"{marker}-session"
-file_path = os.path.join(project, "hosts/hermes/agentmemory.nix")
+file_path = os.path.join(project, "den/entities.nix")
 
 
 def request(method, path, payload=None, timeout_override=None):
@@ -176,8 +176,8 @@ try:
             "tool_name": "Read",
             "tool_input": {"file_path": file_path},
             "tool_output": (
-                f"{marker} proves Agent Memory auto-compression via CLIProxyAPI for ONE-92. "
-                "The observed relation is: ONE-92 uses CLIProxyAPI model gpt-5.4-mini. "
+                f"{marker} proves Agent Memory auto-compression via the local OMP gateway for ONE-92. "
+                "The observed relation is: ONE-92 uses the OMP-routed model gpt-5.4-mini. "
                 f"Relevant file: {file_path}."
             ),
         },
@@ -192,7 +192,7 @@ try:
     enrich = request("POST", "/agentmemory/enrich", {
         "sessionId": session_id,
         "files": [file_path],
-        "terms": [marker, "ONE-92", "CLIProxyAPI"],
+        "terms": [marker, "ONE-92", "OMP"],
         "toolName": "Read",
     })
     if marker not in json.dumps(enrich) and "agentmemory-relevant-context" not in json.dumps(enrich):
@@ -231,9 +231,9 @@ try:
         "id": observation_id,
         "sessionId": session_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "title": f"{marker} CLIProxyAPI relation",
-        "narrative": f"{marker} belongs_to ONE-92 and uses CLIProxyAPI model gpt-5.4-mini for Agent Memory LLM behavior.",
-        "concepts": [marker, "ONE-92", "CLIProxyAPI", "gpt-5.4-mini"],
+        "title": f"{marker} OMP gateway relation",
+        "narrative": f"{marker} belongs_to ONE-92 and uses the local OMP gateway model gpt-5.4-mini for Agent Memory LLM behavior.",
+        "concepts": [marker, "ONE-92", "OMP", "gpt-5.4-mini"],
         "files": [file_path],
         "type": "fact",
         "importance": 0.8,

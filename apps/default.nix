@@ -4,14 +4,18 @@
 # lockfile pin as the NixOS modules. Linux-only operational smokes wrap shell
 # scripts under ../tools. Invoke with:
 #   nix run .#nixos-anywhere -- --flake .#nixos-hermes ...
-#   nix run .#disko -- --mode disko hosts/hermes/disk-config.nix
+#   nix run .#disko-hermes
 {
   pkgs,
   lib,
   system,
   nixos-anywhere,
   disko,
+  hostDiskoDevices,
 }:
+let
+  diskoPackage = disko.packages.${system}.disko;
+in
 {
   nixos-anywhere = {
     type = "app";
@@ -19,11 +23,27 @@
   };
   disko = {
     type = "app";
-    program = "${disko.packages.${system}.disko}/bin/disko";
+    program = "${diskoPackage}/bin/disko";
   };
 }
 // lib.optionalAttrs (system == "x86_64-linux") (
   let
+    hostDiskoDevicesJson = pkgs.writeText "nixos-hermes-disko-devices.json" (
+      builtins.toJSON hostDiskoDevices
+    );
+    hostDiskoConfig = pkgs.writeText "nixos-hermes-disko.nix" ''
+      { ... }:
+      {
+        disko.devices = builtins.fromJSON (builtins.readFile ${hostDiskoDevicesJson});
+      }
+    '';
+    diskoHermes = pkgs.writeShellApplication {
+      name = "disko-hermes";
+      runtimeInputs = [ diskoPackage ];
+      text = ''
+        exec disko --mode disko ${hostDiskoConfig} "$@"
+      '';
+    };
     prePrVerify = pkgs.writeShellApplication {
       name = "pre-pr-verify";
       runtimeInputs = [
@@ -49,6 +69,10 @@
     };
   in
   {
+    disko-hermes = {
+      type = "app";
+      program = "${diskoHermes}/bin/disko-hermes";
+    };
     pre-pr-verify = {
       type = "app";
       program = "${prePrVerify}/bin/pre-pr-verify";

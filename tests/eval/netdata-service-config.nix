@@ -31,7 +31,7 @@ pkgs.runCommand "netdata-service-config" { } ''
   test '${netdataCfg.config.plugins.freeipmi}' = 'no'
   test '${netdataCfg.config.plugins."logs-management"}' = 'no'
   test '${toString (builtins.elem "systemd-journal" netdataSupplementaryGroups)}' = '1'
-  test '${hostConfig.sops.secrets.netdata-claim-conf.sopsFile}' = '${../../hosts/hermes/secrets/netdata-claim.conf}'
+  test '${hostConfig.sops.secrets.netdata-claim-conf.sopsFile}' = '${../../den/hosts/nixos-hermes/secrets/payload/netdata-claim.conf}'
   test '${toString (builtins.elem "netdata_claim_conf:${hostConfig.sops.secrets.netdata-claim-conf.path}" netdataLoadCredentials)}' = '1'
   grep -q -- 'netdata-install-cloud-claim-conf' <<'EOF'
   ${builtins.toString netdataUnit.serviceConfig.ExecStartPre}

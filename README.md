@@ -43,16 +43,17 @@ replicates the primary ESP to the fallback via `rsync`.
 
 ZFS ARC is capped at 16GB to leave headroom for the agent workload.
 
-Disk layout, partitioning, and the generated `fileSystems.*` entries are all
-driven from `hosts/hermes/disk-config.nix` via the
-[disko](https://github.com/nix-community/disko) NixOS module.
+Disk layout, partitioning, and the generated `fileSystems.*` entries are
+modeled as Den storage facts in `den/schema.nix` / `den/entities.nix`. The
+flake renders those facts into the [disko](https://github.com/nix-community/disko)
+NixOS module and the `disko-hermes` app from the same source of truth.
 
 ### Secrets Management
 
 Secrets are managed with [sops-nix](https://github.com/Mic92/sops-nix) and
 [age](https://github.com/FiloSottile/age). The age host key lives at
 `/etc/secrets/age.key` (generated once, placed manually during bootstrap).
-Encrypted secrets live under `hosts/hermes/secrets/` and are decrypted at activation
+Encrypted secrets live under `den/hosts/nixos-hermes/secrets/payload/` and are decrypted at activation
 time.
 
 ### Hermes Agent
@@ -89,17 +90,12 @@ nixos-hermes/
 ├── .sops.yaml                         # sops encryption rules (age keys)
 ├── .secrets/                          # gitignored — plaintext secrets (local only)
 │   └── hermes-secrets.yaml            # template; encrypt before committing
-├── hosts/
-│   └── hermes/
-│       ├── default.nix                # host entry: identity constants + imports
-│       ├── disk-config.nix            # disko layout (imported; generates fileSystems.*)
-│       ├── hardware.nix               # boot, initrd, kernel, GPU, ZFS services
-│       ├── sops.nix                   # SOPS secret bindings
-│       └── secrets/                   # encrypted secret files (committed)
-└── modules/
-    ├── system.nix                     # locale, tz, networking, packages, sudo
-    ├── hermes-agent.nix               # hermes service declaration
-    └── users.nix                      # immutable user + SSH key definitions
+└── den/
+    ├── default.nix                    # Den model entrypoint
+    ├── schema.nix                     # repo-local host/user/service/storage schema
+    ├── entities.nix                   # host facts and render aspects
+    ├── lab.nix                        # local lab namespace/category skeleton
+    └── hosts/nixos-hermes/secrets/payload/ # committed SOPS-encrypted payloads
 ```
 
 ---
@@ -182,8 +178,8 @@ find extra-files -type f -exec shred -u {} +
 rm -rf extra-files
 ```
 
-This kexec's the target into the NixOS installer, runs disko from
-`hosts/hermes/disk-config.nix` to partition and mount, installs, and reboots.
+This kexec's the target into the NixOS installer, runs Disko from the
+Den-declared host storage facts to partition and mount, installs, and reboots.
 The age key is seeded into `/etc/secrets/age.key` on the installed system so
 sops-nix can decrypt secrets on first activation.
 
@@ -195,9 +191,11 @@ workaround, live in [`AGENTS.md`](AGENTS.md#first-install).
 ## Applying the Changes
 
 There is no automated deployment step yet. For host-affecting feature branches,
-use the branch itself as the deployment artifact:
+use the branch as a temporary validation artifact only; persistent switches use
+the reviewed, merged, published remote flake unless an operator explicitly
+authorizes otherwise:
 
-1. Push the branch with `but push` so a remote flake ref exists.
+1. Push the branch with `but push` so a remote flake ref exists for review and temporary validation.
 2. Run local pre-host validation from a clean checkout: `nix flake check
    --no-build`, `nixos-rebuild dry-build`, and, for unit/runtime changes,
    `nixos-rebuild dry-activate`.
@@ -210,9 +208,9 @@ use the branch itself as the deployment artifact:
 5. Run the relevant local validation and post-test smoke checks; commit and push
    any fixes.
 6. Open the PR once the pushed branch contains the validated local state.
-7. Run `nixos-rebuild switch` from the remote branch flake ref, not the local
-   checkout, so boot-default deployment proves the remote PR branch is
-   self-contained and in sync with what was tested locally.
+7. After review, merge, CI, and FlakeHub publication, run persistent
+   `nixos-rebuild switch` from the published remote flake path unless an
+   operator explicitly authorizes a local or PR-branch switch.
 
 ```bash
 ssh admin@nixos-hermes
@@ -221,8 +219,7 @@ nixos-rebuild dry-build --flake /var/lib/hermes/workspace/nixos-hermes#nixos-her
 sudo nixos-rebuild dry-activate --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
 sudo zfs snapshot -r rpool@pre-<change>-$(date -u +%Y%m%dT%H%M%SZ)
 sudo nixos-rebuild test --flake /var/lib/hermes/workspace/nixos-hermes#nixos-hermes -L
-sudo nixos-rebuild switch --flake \
-  'git+https://github.com/rzp-labs/nixos-hermes.git?ref=refs/heads/<branch>#nixos-hermes' -L
+sudo nixos-rebuild switch --flake github:rzp-labs/nixos-hermes#nixos-hermes -L
 ```
 
 After the PR lands on `main`, future production rebuilds can use the canonical
