@@ -17,8 +17,6 @@ in
       secretModules = [ ];
       platformModules = [ ];
       serviceModules = [
-        "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
-        "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
       ];
       sharedModules = [ ];
     in
@@ -173,6 +171,125 @@ in
           ghConfigRelativeDir = ".config/gh";
         };
       };
+      services.hermesAgent = {
+        enable = true;
+        addToSystemPackages = true;
+        extraDependencyGroups = [ "messaging" ];
+        extraPackages = [
+          "playwright-driver.browsers"
+          "ffmpeg"
+          "ripgrep"
+          "libopus"
+          "claude-code"
+          "codex"
+          "bun"
+          "linear-cli"
+          "fh"
+          "repowise"
+          "repowise-nix"
+          "llm-agents.omp"
+          "llm-agents.agent-browser"
+          "mcp-nixos"
+        ];
+        environment = {
+          DISCORD_ALLOWED_USERS = "185292472836947968";
+          DISCORD_HOME_CHANNEL = "1493934973009526884";
+        };
+        environmentSecretNames = [ "hermes-env" ];
+        model = {
+          provider = "openai-codex";
+          default = "gpt-5.5";
+          baseUrl = "https://api.openai.com/v1/responses";
+        };
+        fallbackModel = {
+          provider = "openrouter";
+          model = "openai/gpt-5.5";
+          baseUrl = "https://openrouter.ai/api/v1";
+        };
+        terminal = {
+          backend = "local";
+          timeout = 180;
+        };
+        platformToolsets.cli = [
+          "search"
+          "browser"
+          "terminal"
+          "file"
+          "code_execution"
+          "vision"
+          "image_gen"
+          "tts"
+          "skills"
+          "todo"
+          "memory"
+          "session_search"
+          "clarify"
+          "delegation"
+          "cronjob"
+          "messaging"
+        ];
+        tts = {
+          provider = "elevenlabs";
+          elevenlabs = {
+            voiceId = "cgSgspJ2msm6clMCkdW9";
+            modelId = "eleven_flash_v2_5";
+          };
+        };
+        discord = {
+          requireMention = true;
+          autoThread = true;
+          reactions = true;
+          historyBackfill = true;
+          allowedChannels = [
+            "1493930581090762833"
+            "1493930714687869028"
+          ];
+          freeResponseChannels = [ ];
+          homeChannel = "1493934973009526884";
+        };
+        groupSessionsPerUser = true;
+        memory = {
+          memoryEnabled = true;
+          userProfileEnabled = true;
+        };
+        compression = {
+          enabled = true;
+          threshold = 0.85;
+        };
+        agent.maxTurns = 100;
+        checkpoints = {
+          enabled = true;
+          maxSnapshots = 50;
+        };
+        mcpServers.nixos.enable = true;
+        runtime = {
+          unsetEnvironment = [ "MESSAGING_CWD" ];
+          timeoutStopSec = 240;
+        };
+      };
+
+      services.hermesAgentPlugins = {
+        pythonPackageSet = "python312Packages";
+        rtkHermes = {
+          version = "1.2.3";
+          hash = "sha256-7YRW6PODrCapfYLFn3DvgHAEME//RGC48GQt+s9ot0s=";
+        };
+        agentmemory = {
+          rev = "1838f4d74c3a0accdd3764e7a8ec155cc140b831";
+          hash = "sha256-1fNOAfTnFC7ElRsZbCtTK0ix4HQC1ld4+aDT97Qn4iA=";
+        };
+        hindsightClient = {
+          version = "0.5.4";
+          url = "https://files.pythonhosted.org/packages/64/69/30c8252e9b6b04876946f05adf8497b1204f90a77f181e2d9c501dcaa317/hindsight_client-0.5.4.tar.gz";
+          hash = "sha256-rcs9+zqxqzSmGdJ8OiqRxCUw6hlxSIpgSh2sLHjVVHs=";
+        };
+        extraPackages = [ "llm-agents.rtk" ];
+        enabledPlugins = [
+          "rtk-rewrite"
+          "agentmemory"
+        ];
+      };
+
       services.netdataMonitoring = {
         enable = true;
         packageVersion = "2.10.3";
@@ -439,6 +556,8 @@ in
       platformVirtualisationPackages = builtins.map packageByName host.platform.virtualisation.packages;
       hardwareExtraModulePackages = builtins.map packageByName host.hardware.extraModulePackages;
       hardwareGraphicsExtraPackages = builtins.map packageByName host.hardware.graphics.extraPackages;
+      hermesExtraPackages = builtins.map packageByName host.services.hermesAgent.extraPackages;
+      hermesPluginExtraPackages = builtins.map packageByName host.services.hermesAgentPlugins.extraPackages;
       repoPath = path: ../. + "/${path}";
       renderSecret =
         _name: secret:
@@ -451,6 +570,286 @@ in
             mode
             path
             ;
+        };
+      hermesAgentModule =
+        {
+          config,
+          lib,
+          pkgs,
+          ...
+        }:
+
+        {
+          services.hermes-agent = {
+            enable = host.services.hermesAgent.enable;
+            addToSystemPackages = host.services.hermesAgent.addToSystemPackages;
+
+            # Optional Hermes pyproject dependency groups included in the sealed Python
+            # environment. The Discord gateway adapter lives in the upstream
+            # "messaging" group; without it the service can run while Discord is absent.
+            extraDependencyGroups = host.services.hermesAgent.extraDependencyGroups;
+
+            # Packages required by enabled toolsets.
+            # playwright-driver.browsers: NixOS-wrapped browser binaries for the browser toolset.
+            # ffmpeg: audio processing for ElevenLabs TTS voice bubble delivery.
+            # ripgrep: fast search used by file and terminal toolsets.
+            # libopus: pins the store path referenced by the opus ctypes shim (see the Den-rendered package overlay).
+            # claude-code, codex: AI coding agents — nixpkgs provides both as of May 2026.
+            # bun: JavaScript runtime, package manager, and build tool.
+            # linear-cli: API-key-backed Linear control plane for headless agent workflows.
+            # fh: official FlakeHub CLI for flake input discovery and conversion.
+            # omp: terminal-based multi-model coding agent from numtide/llm-agents.nix overlay.
+            # agent-browser: headless browser automation CLI from llm-agents.nix (built from source, auto-updated daily).
+            # repowise: local repo-intelligence/orientation map for nixos-hermes work.
+            extraPackages = hermesExtraPackages;
+
+            # Non-secret environment variables injected into the service.
+            # PLAYWRIGHT_BROWSERS_PATH tells hermes's internal Playwright where NixOS
+            # placed the browser binaries (standard PATH lookup does not work for Playwright).
+            # DISCORD_ALLOWED_USERS: user allowlisting is env-only; settings.discord has no
+            # equivalent key — placing it here keeps it out of the secret bundle.
+            # DISCORD_HOME_CHANNEL: 0.10.0 gateway reads this env var to determine the home
+            # channel; settings.discord.home_channel populates config.yaml but is not consulted
+            # by the runtime check.
+            environment = {
+              PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
+              DISCORD_ALLOWED_USERS = host.services.hermesAgent.environment.DISCORD_ALLOWED_USERS;
+              DISCORD_HOME_CHANNEL = host.services.hermesAgent.environment.DISCORD_HOME_CHANNEL;
+            };
+
+            # API keys merged into $HERMES_HOME/.env at activation.
+            # Current keys include Discord/ElevenLabs/OpenRouter/Linear/GitHub plus scoped
+            # tool credentials such as GEMINI_API_KEY and REPOWISE_OPENAI_*.
+            environmentFiles = builtins.map (
+              name: config.sops.secrets.${name}.path
+            ) host.services.hermesAgent.environmentSecretNames;
+
+            settings = {
+              model = {
+                # OpenAI Codex provider uses the Responses API endpoint.
+                base_url = lib.mkDefault host.services.hermesAgent.model.baseUrl;
+                default = lib.mkDefault host.services.hermesAgent.model.default;
+                provider = lib.mkDefault host.services.hermesAgent.model.provider;
+              };
+
+              # Automatic provider failover on rate limits, overload, or connection
+              # failures. OpenRouter uses an API key (not OAuth) so it survives
+              # Nous inference token expiry or refresh failures.
+              fallback_model = {
+                provider = lib.mkDefault host.services.hermesAgent.fallbackModel.provider;
+                base_url = lib.mkDefault host.services.hermesAgent.fallbackModel.baseUrl;
+                model = lib.mkDefault host.services.hermesAgent.fallbackModel.model;
+              };
+
+              # Replaces the deprecated MESSAGING_CWD environment variable.
+              # The upstream module still injects MESSAGING_CWD into the service;
+              # UnsetEnvironment below removes it so hermes reads only config.yaml.
+              terminal = {
+                backend = host.services.hermesAgent.terminal.backend;
+                cwd = config.services.hermes-agent.workingDirectory;
+                timeout = host.services.hermesAgent.terminal.timeout;
+              };
+
+              # Capabilities the agent may invoke.
+              # Use per-platform toolsets so CLI keeps search/browser/terminal/file/etc.
+              # without inheriting the web toolset's LLM summarization path.
+              platform_toolsets.cli = host.services.hermesAgent.platformToolsets.cli;
+
+              tts = {
+                provider = host.services.hermesAgent.tts.provider;
+                elevenlabs = {
+                  voice_id = host.services.hermesAgent.tts.elevenlabs.voiceId;
+                  model_id = host.services.hermesAgent.tts.elevenlabs.modelId;
+                };
+              };
+
+              # Discord operational behaviour — not secrets; live here, not in hermes-env.
+              # DISCORD_BOT_TOKEN remains in the hermes-env sops secret.
+              # DISCORD_ALLOWED_USERS is wired via environment above (config.yaml has no allowed_users key).
+              discord = {
+                require_mention = host.services.hermesAgent.discord.requireMention; # Respond only when @mentioned
+                auto_thread = host.services.hermesAgent.discord.autoThread; # Isolate each conversation in a thread
+                reactions = host.services.hermesAgent.discord.reactions; # Emoji reactions for processing state
+                # Keep the upstream default explicit: if Discord presence expands beyond
+                # the restricted Hermes channels below, review this context-ingestion boundary.
+                history_backfill = host.services.hermesAgent.discord.historyBackfill;
+                allowed_channels = host.services.hermesAgent.discord.allowedChannels;
+                free_response_channels = host.services.hermesAgent.discord.freeResponseChannels; # Channels that respond without @mention
+                home_channel = host.services.hermesAgent.discord.homeChannel; # hermes-home (text)
+              };
+
+              # One session per user per channel — prevents session bleed in shared servers.
+              group_sessions_per_user = host.services.hermesAgent.groupSessionsPerUser;
+
+              memory = {
+                memory_enabled = host.services.hermesAgent.memory.memoryEnabled;
+                user_profile_enabled = host.services.hermesAgent.memory.userProfileEnabled;
+              };
+
+              # Compress context at 50% of the model's context window.
+              compression = {
+                enabled = host.services.hermesAgent.compression.enabled;
+                threshold = host.services.hermesAgent.compression.threshold;
+              };
+
+              agent = {
+                max_turns = host.services.hermesAgent.agent.maxTurns; # Hard ceiling on turns per conversation
+              };
+
+              checkpoints = {
+                enabled = host.services.hermesAgent.checkpoints.enabled;
+                max_snapshots = host.services.hermesAgent.checkpoints.maxSnapshots;
+              };
+            };
+            mcpServers = {
+              nixos = lib.mkIf host.services.hermesAgent.mcpServers.nixos.enable {
+                command = "${pkgs.mcp-nixos}/bin/mcp-nixos";
+                args = [ ];
+              };
+            };
+          };
+
+          # MESSAGING_CWD is deprecated in 0.10.0 in favour of terminal.cwd in config.yaml.
+          # The upstream nixosModules.nix still sets it unconditionally; UnsetEnvironment
+          # removes it from the service environment so hermes sees only the config.yaml value.
+          systemd.services.hermes-agent = {
+            # The upstream module writes config.yaml under mutable HERMES_HOME during
+            # activation. Changes to that file do not necessarily change the systemd unit,
+            # so NixOS can refresh config without restarting the long-lived gateway. Force
+            # a restart when runtime config inputs change so provider/plugin/MCP cutovers
+            # actually reach the running process.
+            restartTriggers = [
+              (pkgs.writeText "hermes-agent-runtime-config-trigger.json" (
+                builtins.toJSON {
+                  settings = config.services.hermes-agent.settings;
+                  mcpServers = config.services.hermes-agent.mcpServers;
+                  extraPlugins = map toString config.services.hermes-agent.extraPlugins;
+                }
+              ))
+            ];
+
+            serviceConfig = {
+              UnsetEnvironment = host.services.hermesAgent.runtime.unsetEnvironment;
+              # Hermes gateway drain timeout is 180s; keep systemd's stop budget longer so
+              # rebuild/test restarts do not SIGKILL the gateway mid-drain.
+              TimeoutStopSec = host.services.hermesAgent.runtime.timeoutStopSec;
+            };
+          };
+
+          # opusCtypesShim patches ctypes.util.find_library("opus") at interpreter startup.
+          # sitecustomize.py is imported by site.py before any user code; PYTHONPATH prepends
+          # our directory so it takes precedence over any existing sitecustomize in site-packages.
+          systemd.services.hermes-agent.environment = {
+            PYTHONPATH = toString pkgs.opusCtypesShim;
+          };
+
+        };
+      hermesAgentPluginsModule =
+        { pkgs, ... }:
+
+        let
+          # Match Hermes 0.12.0's sealed Python environment. The pinned nixpkgs
+          # default is Python 3.13, while the Hermes wrapper currently runs Python 3.12;
+          # using pkgs.python3Packages would build plugins for the wrong interpreter.
+          pythonPackages = pkgs.${host.services.hermesAgentPlugins.pythonPackageSet};
+
+          rtkHermes = pythonPackages.buildPythonPackage rec {
+            pname = "rtk-hermes";
+            version = host.services.hermesAgentPlugins.rtkHermes.version;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "ogallotti";
+              repo = "rtk-hermes";
+              rev = "v${version}";
+              hash = host.services.hermesAgentPlugins.rtkHermes.hash;
+            };
+
+            pyproject = true;
+            build-system = [ pythonPackages.setuptools ];
+            # rtk-hermes declares no mandatory third-party runtime Python dependencies
+            # in pyproject.toml. Its runtime integration shells out to the `rtk` binary,
+            # which is supplied through services.hermes-agent.extraPackages below.
+            dependencies = [ ];
+
+            pythonImportsCheck = [ "rtk_hermes" ];
+          };
+
+          aiohttpRetryForHermes = pythonPackages.aiohttp-retry.overridePythonAttrs (_old: {
+            # Hermes' sealed runtime already supplies aiohttp. Propagating it from this
+            # extra package collides with the sealed environment; only add the missing
+            # aiohttp_retry distribution to the Hermes wrapper. Newer nixpkgs Python
+            # builders use `dependencies`; clear both fields so the generated wrapper
+            # closure cannot reintroduce aiohttp through either spelling.
+            dependencies = [ ];
+            propagatedBuildInputs = [ ];
+            doCheck = false;
+            pythonImportsCheck = [ ];
+            dontCheckRuntimeDeps = true;
+          });
+
+          agentmemorySource = pkgs.fetchFromGitHub {
+            owner = "rohitg00";
+            repo = "agentmemory";
+            rev = host.services.hermesAgentPlugins.agentmemory.rev;
+            hash = host.services.hermesAgentPlugins.agentmemory.hash;
+          };
+
+          agentmemoryHermesPlugin = pkgs.runCommand "agentmemory-hermes-plugin-0.9.21" { } ''
+            mkdir -p $out
+            cp -R ${agentmemorySource}/integrations/hermes/. $out/
+          '';
+
+          hindsightClient = pythonPackages.buildPythonPackage rec {
+            pname = "hindsight-client";
+            version = host.services.hermesAgentPlugins.hindsightClient.version;
+
+            src = pkgs.fetchurl {
+              url = host.services.hermesAgentPlugins.hindsightClient.url;
+              hash = host.services.hermesAgentPlugins.hindsightClient.hash;
+            };
+
+            pyproject = true;
+            build-system = [ pythonPackages.hatchling ];
+
+            dependencies = [ ];
+            dontCheckRuntimeDeps = true;
+
+            # These are already present in the Hermes sealed runtime. Keep them available
+            # for this package's build-time import check without propagating duplicate
+            # distributions into services.hermes-agent.extraPythonPackages, where the
+            # Hermes build intentionally rejects sealed-venv collisions.
+            nativeCheckInputs = with pythonPackages; [
+              aiohttp
+              aiohttp-retry
+              pydantic
+              python-dateutil
+              typing-extensions
+              urllib3
+            ];
+
+            pythonImportsCheck = [ "hindsight_client" ];
+          };
+        in
+        {
+          services.hermes-agent = {
+            # Entry-point plugins are installed into the Hermes Python wrapper via
+            # extraPythonPackages. Directory plugins should use extraPlugins instead;
+            # see docs/guides/HERMES_PLUGINS_NIX.md for the repeatable workflow.
+            extraPythonPackages = [
+              rtkHermes
+              aiohttpRetryForHermes
+              hindsightClient
+            ];
+
+            # rtk-hermes rewrites terminal commands through the rtk binary. Keep the
+            # executable in the Hermes service PATH declaratively instead of relying on
+            # mutable state in the service home.
+            extraPackages = hermesPluginExtraPackages;
+
+            extraPlugins = [ agentmemoryHermesPlugin ];
+
+            settings.plugins.enabled = host.services.hermesAgentPlugins.enabledPlugins;
+          };
         };
       netdataMonitoringModule =
         # Netdata Cloud agent plus a native CLI for Hermes access to metrics/logs.
@@ -1827,6 +2226,8 @@ in
             };
           }
           hindsightEmbedModule
+          hermesAgentModule
+          hermesAgentPluginsModule
           netdataMonitoringModule
           agentMemoryModule
           ompAuthGatewayModule

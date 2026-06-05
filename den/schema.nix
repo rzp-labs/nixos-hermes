@@ -517,6 +517,18 @@ in
           description = "Netdata monitoring and bounded observe helper facts.";
         };
 
+        services.hermesAgent = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Hermes Agent runtime facts rendered by the Den host aspect.";
+        };
+
+        services.hermesAgentPlugins = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Hermes Agent plugin/package pin facts rendered by the Den host aspect.";
+        };
+
         services.agentMemory = lib.mkOption {
           type = lib.types.submodule {
             options = {

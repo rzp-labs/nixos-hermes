@@ -28,8 +28,6 @@ let
 
   expectedModuleImports = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
-    "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
-    "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
   expectedHardwareModules = [ ];
   expectedStorageModules = [
@@ -38,8 +36,6 @@ let
   expectedSecretModules = [ ];
   expectedPlatformModules = [ ];
   expectedServiceModules = [
-    "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
-    "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
   expectedSharedModules = [ ];
   allHostModulesUnderDen = builtins.all (
@@ -153,6 +149,24 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${toString host.services.netdataMonitoring.logDefaultLines}' = '120'
   test '${toString host.services.netdataMonitoring.logMaxLines}' = '500'
   test '${host.services.netdataMonitoring.postgresSocketDir}' = '/var/run/postgresql'
+  test '${if host.services.hermesAgent.enable then "true" else "false"}' = 'true'
+  test '${if host.services.hermesAgent.addToSystemPackages then "true" else "false"}' = 'true'
+  test '${builtins.concatStringsSep "," host.services.hermesAgent.extraDependencyGroups}' = 'messaging'
+  test '${builtins.concatStringsSep "," host.services.hermesAgent.extraPackages}' = 'playwright-driver.browsers,ffmpeg,ripgrep,libopus,claude-code,codex,bun,linear-cli,fh,repowise,repowise-nix,llm-agents.omp,llm-agents.agent-browser,mcp-nixos'
+  test '${host.services.hermesAgent.model.provider}' = 'openai-codex'
+  test '${host.services.hermesAgent.model.default}' = 'gpt-5.5'
+  test '${host.services.hermesAgent.fallbackModel.provider}' = 'openrouter'
+  test '${host.services.hermesAgent.terminal.backend}' = 'local'
+  test '${toString host.services.hermesAgent.terminal.timeout}' = '180'
+  test '${builtins.concatStringsSep "," host.services.hermesAgent.discord.allowedChannels}' = '1493930581090762833,1493930714687869028'
+  test '${if host.services.hermesAgent.memory.memoryEnabled then "true" else "false"}' = 'true'
+  test '${toString host.services.hermesAgent.compression.threshold}' = '0.850000'
+  test '${toString host.services.hermesAgent.agent.maxTurns}' = '100'
+  test '${toString host.services.hermesAgent.runtime.timeoutStopSec}' = '240'
+  test '${host.services.hermesAgentPlugins.rtkHermes.version}' = '1.2.3'
+  test '${host.services.hermesAgentPlugins.agentmemory.rev}' = '1838f4d74c3a0accdd3764e7a8ec155cc140b831'
+  test '${host.services.hermesAgentPlugins.hindsightClient.version}' = '0.5.4'
+  test '${builtins.concatStringsSep "," host.services.hermesAgentPlugins.enabledPlugins}' = 'rtk-rewrite,agentmemory'
   test '${boolString host.services.hindsightMemory.llama.enable}' = 'false'
   test '${host.services.hindsightMemory.llama.modelPath}' = '/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf'
   test '${host.services.hindsightMemory.llama.host}' = '127.0.0.1'
