@@ -1,8 +1,10 @@
 # Den Homelab Architecture
 
-Review basis: Den `v0.17.0` / `latest` at `8f1a59448043677ac8bc7854348c1b8ee6889c0b`, released 2026-05-21. This document describes the target homelab model against Den 0.17.0 semantics, not the older pre-effect-core architecture.
+Review basis: Den `v0.17.0` / `latest` at `8f1a59448043677ac8bc7854348c1b8ee6889c0b`, released 2026-05-21. This document describes the Den architecture direction for this repo against Den 0.17.0 semantics, not the older pre-effect-core architecture.
 
-Reviewer entrypoint: if you are comfortable with Nix but new to Den, start with `docs/guides/DEN_REVIEW_GUIDE.md`. This architecture document explains the target model; the review guide explains how to assess Den-shaped changes in this repo.
+Reviewer entrypoint: if you are comfortable with Nix but new to this repo's current Den wiring, start with root `REVIEW.md`. This architecture document explains the intended Den shape and vocabulary; `REVIEW.md` explains how the current branch is wired today.
+
+This file is not a claim that every NixOS module has already moved to Den. Current implemented ownership is listed in `REVIEW.md`; as of this branch, hardware, Disko/ZFS, SOPS/secrets, virtualization, provisioning scripts, package overlay definitions, and runtime service modules remain native NixOS imports.
 
 Den owns the shape of the infrastructure model. The homelab is a semantic graph: typed entities describe what exists, aspects describe behavior, policies describe topology and output routing, and quirks/pipes move structured operational data between scopes. Host files are inventory, not implementation dumps.
 

@@ -22,10 +22,10 @@ nixos-hermes/
 │   │   ├── netdata-service-config.nix   # Netdata config + observe wrapper + MCP wiring
 │   │   └── hindsight-service-config.nix # asserts Hindsight memory stays disabled
 │   └── default.nix                      # nixosTest VM test suite
-├── den/                                 # eval-only Den model surface (not deployment output)
+├── den/                                 # Den model + rendered host/user/HM/system baseline
 │   ├── default.nix                      # Den model module entrypoint
 │   ├── schema.nix                       # repo-local host/user schema facts
-│   ├── entities.nix                     # nixos-hermes/admin/hermes inventory facts
+│   ├── entities.nix                     # inventory facts + migrated Den render aspects
 │   └── lab.nix                          # local lab namespace/category skeleton
 ├── checks/
 │   └── pre-commit.nix                   # git-hooks.nix hook config (dev shell + pre-commit-check)
@@ -39,7 +39,7 @@ nixos-hermes/
 │   └── hermes-secrets.yaml              # never commit; encrypt before use
 ├── hosts/
 │   └── hermes/
-│       ├── default.nix                  # host entry: identity constants + imports
+│       ├── default.nix                  # host entry: imports only; identity rendered from Den
 │       ├── disk-config.nix              # disko layout (imported; generates fileSystems.*)
 │       ├── hardware.nix                 # boot, initrd, kernel, GPU, ZFS services (filesystems via disko)
 │       ├── provision.nix                # host-specific activation scripts (one-shot provisioning + recurring refresh)
@@ -47,12 +47,12 @@ nixos-hermes/
 │       ├── virtualisation.nix           # Docker/libvirt host substrate and host-specific group memberships
 │       └── secrets/                     # committed SOPS-encrypted files
 ├── modules/
-│   ├── system.nix                       # locale, tz, networking, packages, sudo
-│   ├── home-manager.nix                 # Home Manager wiring for admin/operator user environment
+│   ├── system.nix                       # marker: base system settings rendered from Den
+│   ├── home-manager.nix                 # HM integration flags; user configs rendered from Den
 │   ├── hermes-agent.nix                 # hermes service declaration
 │   ├── hermes-plugins.nix               # declarative Hermes plugin packages/enables
 │   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds, Repowise)
-│   └── users.nix                        # immutable user + SSH key declarations
+│   └── users.nix                        # immutable-users flag; users/SSH rendered from Den
 ```
 
 ---
@@ -92,7 +92,7 @@ nixos-hermes/
 
 ### Users
 
-- `users.mutableUsers = false` — the NixOS activation will reject any user state not described in `users.nix`. Do not add users imperatively on the host.
+- `users.mutableUsers = false` — the NixOS activation rejects user state not described declaratively. The flag remains in `modules/users.nix`, while the actual `root`, `admin`, and `hermes` user/SSH declarations are rendered from `den/entities.nix` through the Den host aspect. Do not add users imperatively on the host.
 - Authentication is via SSH key only. Do not add password hashes unless explicitly requested.
   requested.
 - `admin` has `wheel` and should have `security.sudo.wheelNeedsPassword = false` set (or equivalent) since there is no password configured.
@@ -251,8 +251,9 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 - `tests/eval/default.nix` is the aggregator: it takes the evaluated
   `hostSystem` once and feeds `config`/`pkgs` into each check, then surfaces them
   through `flake.nix`'s `checks.x86_64-linux.*` output.
-- Checks that assert on the eval-only Den model may additionally take `denModel`;
-  they must not imply the Den model is the deployment output.
+- Checks that assert on Den inventory/model shape may additionally take
+  `denModel`; they must distinguish model-shape assertions from rendered
+  deployment behavior.
 - These are evaluation/build checks, **not** VM tests — they sit alongside the VM
   suite in `tests/` but never boot a guest. Run one with
   `nix build .#checks.x86_64-linux.<name>`.
@@ -261,28 +262,33 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 
 ### `den/`
 
-*Eval-only Den model surface for the homelab graph.*
+*Den model and rendered baseline output for the homelab graph.*
 
-- Reviewers new to Den should start with `docs/guides/DEN_REVIEW_GUIDE.md`;
-  keep that guide source-controlled and updated as Den becomes the repo shape.
-- This is a planning/modeling surface, not the live host deployment output.
-  `nixosConfigurations.nixos-hermes` remains the source of truth for host
-  deployment until a later milestone deliberately changes that boundary.
+- Reviewers new to this branch should start with root `REVIEW.md` for the
+  factual technical overview and root `ARCHITECTURE.md` for the target Den
+  architecture direction.
+- `nixosConfigurations.nixos-hermes` remains the deployment output, but it now
+  imports `self.denModel.den.hosts.x86_64-linux.nixos-hermes.mainModule`.
+  Den-rendered NixOS/Home Manager output owns migrated baseline config.
 - `schema.nix` owns repo-local host/user vocabulary mirrored from current code,
   such as imported module paths, service-module lists, `stateVersion`,
-  `nixpkgsHostPlatform`, user homes, groups, Home Manager presence, and SSH-key
-  configuration presence. Do not add aspirational/persona fields here unless an
-  existing source file already encodes that fact.
+  `nixpkgsHostPlatform`, host identity, baseline system packages, user homes,
+  groups, Home Manager presence, and SSH keys. Do not add aspirational/persona
+  fields here unless an existing source file already encodes that fact.
 - `entities.nix` owns current repo-safe inventory facts for `nixos-hermes`,
-  `admin`, and `hermes`. Keep these inventory-like and source-grounded; do not
-  hide large NixOS or Home Manager modules here.
+  `root`, `admin`, `hermes`, and VM fixture user `den-poc`. It also owns the
+  Den aspects that render the migrated system baseline, user declarations, SSH
+  keys, and `admin`/`hermes` Home Manager config. Keep entities inventory-like;
+  extract reusable behavior into `lab.*` as it grows.
 - `lab.nix` owns the local `lab` namespace/category skeleton. Reusable behavior
   should later land under `lab.platform`, `lab.features`, `lab.workloads`,
   `lab.hardware`, `lab.users`, or `lab.quirks`; concrete host/user aspects should
   stay thin composition points.
 - Do not add custom fleet/environment topology, quirks that drive production
-  config, or host-service migrations here without a follow-up issue and eval
-  proof. First-slice Den work uses the default host/home traversal policies.
+  config, or host-service migrations here without a follow-up issue and eval/VM
+  proof. Current Den-rendered production scope is users, SSH keys, Home Manager,
+  and host/system baseline. Hardware, Disko/ZFS, SOPS/secrets, virtualization,
+  and service runtime modules remain native host imports.
 
 ### `checks/pre-commit.nix`
 
@@ -309,8 +315,11 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 
 *Host entry point.*
 
-- Contains machine-specific identity constants (`hostName`, `hostId`, `stateVersion`, `hostPlatform`) and the import list. Nothing else.
-- These constants must never be extracted into shared modules.
+- Contains the host import list only. Machine-specific identity constants
+  (`hostName`, `hostId`, `stateVersion`, `hostPlatform`) are Den host facts in
+  `den/entities.nix` and are rendered through the Den host aspect.
+- Do not re-add identity/system baseline options here; that would create a
+  duplicate owner with Den.
 
 ### `hosts/hermes/hardware.nix`
 
@@ -382,17 +391,23 @@ After first install:
 
 *Base system settings.*
 
-- Includes: locale, timezone, networking, openssh, sudo, packages, and session variables.
-- No host-specific values.
+- Marker module only. Locale, timezone, networking, OpenSSH, sudo, packages,
+  and session variables are rendered from `den/entities.nix` via the Den host
+  aspect.
+- Do not re-add migrated baseline options here unless intentionally reverting
+  Den ownership.
 
 ### `modules/home-manager.nix`
 
 *User-scoped interactive/operator environment.*
 
-- Owns Home Manager module configuration for user environments managed on this host.
-- Keep human/operator shell UX and per-user toolchains here rather than in host-wide shell init.
-- Shared user-facing toolchains used by both the operator and the Hermes service persona belong here for each intended home, not in `environment.systemPackages` by accident.
-- Add other service accounts deliberately; review their runtime state boundary before Home Manager owns additional home files.
+- Owns only Home Manager's NixOS integration flags (`useGlobalPkgs`,
+  `useUserPackages`). The `admin` and `hermes` Home Manager user modules are
+  rendered from Den.
+- Keep new user-facing toolchain changes in the Den user/home aspects unless
+  intentionally changing this ownership boundary.
+- Add other service accounts deliberately; review their runtime state boundary
+  before Home Manager owns additional home files.
 
 ### `modules/hermes-agent.nix`
 
@@ -415,8 +430,10 @@ After first install:
 
 *Immutable user definitions.*
 
-- The only place user accounts and authorized SSH keys should appear.
-- Lives in `modules/` because it is portable across hosts.
+- Owns `users.mutableUsers = false` and the admin workspace tmpfiles marker.
+- User accounts and authorized SSH keys for `root`, `admin`, and `hermes` are
+  rendered from Den. Do not re-add them here unless intentionally reverting Den
+  ownership.
 
 ---
 
