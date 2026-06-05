@@ -146,6 +146,7 @@ let
       };
 
       security.sudo.wheelNeedsPassword = false;
+      den.fixtures.denPoc.enable = true;
       home-manager.users.den-poc = lib.mkIf denPoc.hasHomeManagerConfig {
         imports = [
           # Native Home Manager config deliberately remains alongside the

@@ -586,14 +586,15 @@ in
         classes = [ "homeManager" ];
       };
 
-      # VM-only fixture used to prove same-user mixed Den/native Home Manager
-      # migration. It is not production inventory.
+      # VM-only fixture facts used by tests to prove same-user mixed Den/native
+      # Home Manager migration. Production rendering gates the user explicitly
+      # with den.fixtures.denPoc.enable instead of treating it as inventory.
       users.den-poc = {
         normalUser = true;
         hasHomeManagerConfig = true;
         home = "/home/den-poc";
         createHome = true;
-        classes = [ "homeManager" ];
+        classes = [ ];
       };
     };
 
@@ -1437,7 +1438,7 @@ in
             ${lib.optionalString cfg.llm.enable ''
               # OMP's auth gateway is loopback-only and runs with --no-auth. Agent Memory
               # still needs a non-empty OpenAI-compatible key to select its LLM path, so
-              # use a local sentinel instead of depending on the unreliable LAN CLIProxyAPI
+              # use a local sentinel instead of depending on the retired LAN proxy
               # secret route.
               export OPENAI_API_KEY=local-auth-gateway
             ''}
@@ -2308,54 +2309,58 @@ in
         ]
         ++ [
           {
-            options.services.hindsightMemory.llama = {
-              enable = lib.mkEnableOption "local llama.cpp inference server for Hindsight memory";
-              modelPath = lib.mkOption {
-                type = lib.types.str;
-                default = host.services.hindsightMemory.llama.modelPath;
-                description = "Absolute path to the GGUF model served by llama.cpp.";
-              };
-              host = lib.mkOption {
-                type = lib.types.str;
-                default = host.services.hindsightMemory.llama.host;
-                description = "Address for llama.cpp's OpenAI-compatible HTTP server.";
-              };
-              port = lib.mkOption {
-                type = lib.types.port;
-                default = host.services.hindsightMemory.llama.port;
-                description = "TCP port for llama.cpp's OpenAI-compatible HTTP server.";
-              };
-              contextSize = lib.mkOption {
-                type = lib.types.ints.positive;
-                default = host.services.hindsightMemory.llama.contextSize;
-                description = "Context size passed to llama.cpp.";
-              };
-              threads = lib.mkOption {
-                type = lib.types.ints.positive;
-                default = host.services.hindsightMemory.llama.threads;
-                description = "CPU threads passed to llama.cpp.";
-              };
-              enableEmbeddings = lib.mkOption {
-                type = lib.types.bool;
-                default = host.services.hindsightMemory.llama.enableEmbeddings;
-                description = "Whether to enable llama.cpp's OpenAI-compatible /v1/embeddings endpoint.";
-              };
-              pooling = lib.mkOption {
-                type = lib.types.nullOr (
-                  lib.types.enum [
-                    "mean"
-                    "cls"
-                    "last"
-                    "rank"
-                  ]
-                );
-                default = host.services.hindsightMemory.llama.pooling;
-                description = "Pooling mode used by llama.cpp when embeddings are enabled.";
-              };
-              chatTemplate = lib.mkOption {
-                type = lib.types.nullOr lib.types.str;
-                default = host.services.hindsightMemory.llama.chatTemplate;
-                description = "Chat template passed to llama.cpp; set to null to let llama.cpp infer it.";
+            options = {
+              den.fixtures.denPoc.enable = lib.mkEnableOption "VM-only den-poc migration fixture user";
+
+              services.hindsightMemory.llama = {
+                enable = lib.mkEnableOption "local llama.cpp inference server for Hindsight memory";
+                modelPath = lib.mkOption {
+                  type = lib.types.str;
+                  default = host.services.hindsightMemory.llama.modelPath;
+                  description = "Absolute path to the GGUF model served by llama.cpp.";
+                };
+                host = lib.mkOption {
+                  type = lib.types.str;
+                  default = host.services.hindsightMemory.llama.host;
+                  description = "Address for llama.cpp's OpenAI-compatible HTTP server.";
+                };
+                port = lib.mkOption {
+                  type = lib.types.port;
+                  default = host.services.hindsightMemory.llama.port;
+                  description = "TCP port for llama.cpp's OpenAI-compatible HTTP server.";
+                };
+                contextSize = lib.mkOption {
+                  type = lib.types.ints.positive;
+                  default = host.services.hindsightMemory.llama.contextSize;
+                  description = "Context size passed to llama.cpp.";
+                };
+                threads = lib.mkOption {
+                  type = lib.types.ints.positive;
+                  default = host.services.hindsightMemory.llama.threads;
+                  description = "CPU threads passed to llama.cpp.";
+                };
+                enableEmbeddings = lib.mkOption {
+                  type = lib.types.bool;
+                  default = host.services.hindsightMemory.llama.enableEmbeddings;
+                  description = "Whether to enable llama.cpp's OpenAI-compatible /v1/embeddings endpoint.";
+                };
+                pooling = lib.mkOption {
+                  type = lib.types.nullOr (
+                    lib.types.enum [
+                      "mean"
+                      "cls"
+                      "last"
+                      "rank"
+                    ]
+                  );
+                  default = host.services.hindsightMemory.llama.pooling;
+                  description = "Pooling mode used by llama.cpp when embeddings are enabled.";
+                };
+                chatTemplate = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = host.services.hindsightMemory.llama.chatTemplate;
+                  description = "Chat template passed to llama.cpp; set to null to let llama.cpp infer it.";
+                };
               };
             };
           }
@@ -2839,7 +2844,10 @@ in
       # Keep the retired Hindsight provider disabled by default but render its
       # cleanup/config activation behavior from Den so stale interactive setup
       # cannot override the active AgentMemory backend.
-      services.hindsightMemory.enable = lib.mkDefault host.services.hindsightMemory.enable;
+      services.hindsightMemory = {
+        enable = lib.mkDefault host.services.hindsightMemory.enable;
+        llama.enable = lib.mkDefault host.services.hindsightMemory.llama.enable;
+      };
 
       services.hermes-agent = lib.mkIf config.services.hindsightMemory.enable {
         settings.memory.provider = "hindsight";
@@ -2882,56 +2890,74 @@ in
         (builtins.map packageByName host.systemPackages) ++ platformVirtualisationPackages;
       environment.sessionVariables.LIBVA_DRIVER_NAME = "iHD";
 
-      users.users.root.openssh.authorizedKeys.keys = root.sshAuthorizedKeys;
-      users.users.admin = {
-        isNormalUser = admin.normalUser;
-        inherit (admin)
-          description
-          home
-          createHome
-          homeMode
-          ;
-        extraGroups = admin.extraGroups ++ host.platform.virtualisation.rootEquivalentGroups;
-        openssh.authorizedKeys.keys = admin.sshAuthorizedKeys;
-      };
-      users.users.hermes = {
-        inherit (hermes) description;
-        extraGroups = host.platform.virtualisation.rootEquivalentGroups;
-        openssh.authorizedKeys.keys = hermes.sshAuthorizedKeys;
-      };
-      users.users.den-poc = {
-        isNormalUser = denPoc.normalUser;
-        inherit (denPoc) home createHome;
+      users.users = {
+        root.openssh.authorizedKeys.keys = root.sshAuthorizedKeys;
+        admin = {
+          isNormalUser = admin.normalUser;
+          inherit (admin)
+            description
+            home
+            createHome
+            homeMode
+            ;
+          extraGroups = admin.extraGroups ++ host.platform.virtualisation.rootEquivalentGroups;
+          openssh.authorizedKeys.keys = admin.sshAuthorizedKeys;
+        };
+        hermes = {
+          inherit (hermes) description;
+          extraGroups = host.platform.virtualisation.rootEquivalentGroups;
+          openssh.authorizedKeys.keys = hermes.sshAuthorizedKeys;
+        };
+        # NixOS has an implicit users.users.<name> option value for names that
+        # appear elsewhere in the module graph. Keep the VM fixture inert and
+        # assertion-safe on the production host; the VM smoke flips it on below.
+        den-poc = {
+          enable = false;
+          isSystemUser = true;
+          group = "nogroup";
+        };
+      }
+      // lib.optionalAttrs config.den.fixtures.denPoc.enable {
+        den-poc = {
+          enable = true;
+          isSystemUser = false;
+          isNormalUser = denPoc.normalUser;
+          inherit (denPoc) home createHome;
+        };
       };
 
-      home-manager.users.admin = pkgs.lib.recursiveUpdate sharedUserConfig direnvConfig // {
-        home = vitePlusHome // {
-          stateVersion = "25.05";
-          packages =
-            (with pkgs; [
-              bat
-              glow
-              yazi
-              inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.omp
-            ])
-            ++ vitePlusToolchain;
-          sessionVariables = {
-            XDG_DATA_HOME = "$HOME/.local/share";
-            XDG_STATE_HOME = "$HOME/.local/state";
-            XDG_CACHE_HOME = "$HOME/.cache";
-            XDG_CONFIG_HOME = "$HOME/.config";
+      home-manager.users = {
+        admin = pkgs.lib.recursiveUpdate sharedUserConfig direnvConfig // {
+          home = vitePlusHome // {
+            stateVersion = "25.05";
+            packages =
+              (with pkgs; [
+                bat
+                glow
+                yazi
+                llm-agents.omp
+              ])
+              ++ vitePlusToolchain;
+            sessionVariables = {
+              XDG_DATA_HOME = "$HOME/.local/share";
+              XDG_STATE_HOME = "$HOME/.local/state";
+              XDG_CACHE_HOME = "$HOME/.cache";
+              XDG_CONFIG_HOME = "$HOME/.config";
+            };
           };
         };
-      };
-      home-manager.users.hermes = sharedUserConfig // {
-        home = vitePlusHome // {
-          stateVersion = "25.05";
-          packages = vitePlusToolchain;
+        hermes = sharedUserConfig // {
+          home = vitePlusHome // {
+            stateVersion = "25.05";
+            packages = vitePlusToolchain;
+          };
         };
-      };
-      home-manager.users.den-poc = {
-        home.stateVersion = "25.05";
-        home.packages = [ pkgs.glow ];
+      }
+      // lib.optionalAttrs config.den.fixtures.denPoc.enable {
+        den-poc = {
+          home.stateVersion = "25.05";
+          home.packages = [ pkgs.glow ];
+        };
       };
 
       virtualisation.docker = {

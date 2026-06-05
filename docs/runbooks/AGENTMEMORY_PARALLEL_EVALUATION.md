@@ -1,6 +1,6 @@
 # Agent Memory LLM runtime on nixos-hermes
 
-Agent Memory is the active Hermes memory provider on `nixos-hermes`. The current target shape is not a shadow observer: the host runs Agent Memory as a NixOS-managed service, Hermes uses the `nix-managed-agentmemory-hermes-plugin` provider, and LLM-backed Agent Memory behavior is routed through the LAN CLIProxyAPI.
+Agent Memory is the active Hermes memory provider on `nixos-hermes`. The current target shape is not a shadow observer: the host runs Agent Memory as a NixOS-managed service, Hermes uses the `nix-managed-agentmemory-hermes-plugin` provider, and LLM-backed Agent Memory behavior is routed through the local OMP auth gateway on loopback.
 
 ## Declarative service
 
@@ -44,36 +44,20 @@ Upstream Agent Memory and the bundled `iii-config.yaml` bind REST/streams/viewer
 
 ## LLM provider contract
 
-Agent Memory uses an OpenAI-compatible chat provider through CLIProxyAPI:
+Agent Memory uses an OpenAI-compatible chat provider through the local OMP auth gateway:
 
 ```env
-OPENAI_BASE_URL=http://10.0.0.102:8317
+OPENAI_BASE_URL=http://127.0.0.1:4000
 OPENAI_MODEL=gpt-5.4-mini
 AGENTMEMORY_LLM_TIMEOUT_MS=120000
 OPENAI_TIMEOUT_MS=120000
+OPENAI_API_KEY=local-auth-gateway
 EMBEDDING_PROVIDER=local
 ```
 
-Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the proxy root (`http://10.0.0.102:8317`), not `http://10.0.0.102:8317/v1`.
+Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the gateway root (`http://127.0.0.1:4000`), not `http://127.0.0.1:4000/v1`.
 
-The CLIProxyAPI key is a raw SOPS secret readable only by the `agentmemory`
-service user:
-
-```nix
-sops.secrets.cliproxyapi-key = {
-  owner = "agentmemory";
-  group = "agentmemory";
-  mode = "0400";
-};
-```
-
-The startup wrapper waits briefly for `/run/secrets/cliproxyapi-key`, reads it
-inside the service process, and exports `OPENAI_API_KEY` there. Do not use
-`LoadCredential` for this secret: during `nixos-rebuild test`/activation,
-systemd can attempt to load credentials while sops-nix is rotating the
-`/run/secrets` symlink, producing a transient `status=243/CREDENTIALS` start
-failure that fails the rebuild even if auto-restart succeeds seconds later. The
-key must not appear in Nix store-backed environment files or generated config.
+The `OPENAI_API_KEY=local-auth-gateway` value is a local sentinel consumed by the loopback OMP gateway, not a LAN CLIProxyAPI credential. Do not add a SOPS CLIProxyAPI key for this path unless the architecture intentionally moves Agent Memory back to an external proxy.
 
 ## Runtime flags
 
@@ -88,9 +72,9 @@ AGENTMEMORY_INJECT_CONTEXT=true
 AGENTMEMORY_TOOLS=core
 ```
 
-`AGENTMEMORY_ALLOW_AGENT_SDK=false` stays off because it is a separate fallback execution path and upstream warns it can spawn child-agent sessions that recurse through plugin hooks. The intended LLM path is CLIProxyAPI through `OPENAI_API_KEY`, not Agent SDK fallback.
+`AGENTMEMORY_ALLOW_AGENT_SDK=false` stays off because it is a separate fallback execution path and upstream warns it can spawn child-agent sessions that recurse through plugin hooks. The intended LLM path is the loopback OMP gateway through `OPENAI_API_KEY`, not Agent SDK fallback.
 
-`EMBEDDING_PROVIDER=local` is explicit so adding the OpenAI-compatible chat key does not silently move embedding traffic to the proxy. Change that only after CLIProxyAPI embedding support is separately proven and intentionally selected.
+`EMBEDDING_PROVIDER=local` is explicit so adding the OpenAI-compatible chat key does not silently move embedding traffic to the gateway. Change that only after remote embedding support is separately proven and intentionally selected.
 
 ## Hermes integration
 
@@ -154,10 +138,10 @@ Run the behavior smoke:
 tools/agentmemory-llm-smoke.sh --timeout 180
 ```
 
-If the CLIProxyAPI process has a known systemd unit on the host, include it so the smoke reports whether proxy logs mention chat completions and the expected model:
+If the OMP gateway process has a known systemd unit on the host, include it so the smoke reports whether gateway logs mention chat completions and the expected model:
 
 ```bash
-tools/agentmemory-llm-smoke.sh --timeout 180 --cliproxy-unit <cliproxyapi-unit-name>
+tools/agentmemory-llm-smoke.sh --timeout 180 --cliproxy-unit omp-auth-gateway.service
 ```
 
 The smoke seeds a disposable marker, verifies Agent Memory records/searches it, exercises `/agentmemory/enrich` and the packaged pre-tool hook when available, runs graph extraction, and runs the consolidation pipeline. It closes its throwaway Agent Memory session with `/agentmemory/session/end` in a `finally` block and fails if that session is not `completed` with `endedAt`, so repeated smoke runs do not inflate the active-session inventory before Docker or source A/B diagnostics. It fails on disabled/skipped responses instead of treating flag presence as success.

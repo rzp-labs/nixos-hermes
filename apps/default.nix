@@ -15,12 +15,6 @@
 }:
 let
   diskoPackage = disko.packages.${system}.disko;
-  hostDiskoConfig = pkgs.writeText "nixos-hermes-disko.nix" ''
-    { ... }:
-    {
-      disko.devices = builtins.fromJSON ${builtins.toJSON hostDiskoDevices};
-    }
-  '';
 in
 {
   nixos-anywhere = {
@@ -31,21 +25,25 @@ in
     type = "app";
     program = "${diskoPackage}/bin/disko";
   };
-  disko-hermes = {
-    type = "app";
-    program = "${
-      pkgs.writeShellApplication {
-        name = "disko-hermes";
-        runtimeInputs = [ diskoPackage ];
-        text = ''
-          exec disko --mode disko ${hostDiskoConfig} "$@"
-        '';
-      }
-    }/bin/disko-hermes";
-  };
 }
 // lib.optionalAttrs (system == "x86_64-linux") (
   let
+    hostDiskoDevicesJson = pkgs.writeText "nixos-hermes-disko-devices.json" (
+      builtins.toJSON hostDiskoDevices
+    );
+    hostDiskoConfig = pkgs.writeText "nixos-hermes-disko.nix" ''
+      { ... }:
+      {
+        disko.devices = builtins.fromJSON (builtins.readFile ${hostDiskoDevicesJson});
+      }
+    '';
+    diskoHermes = pkgs.writeShellApplication {
+      name = "disko-hermes";
+      runtimeInputs = [ diskoPackage ];
+      text = ''
+        exec disko --mode disko ${hostDiskoConfig} "$@"
+      '';
+    };
     prePrVerify = pkgs.writeShellApplication {
       name = "pre-pr-verify";
       runtimeInputs = [
@@ -71,6 +69,10 @@ in
     };
   in
   {
+    disko-hermes = {
+      type = "app";
+      program = "${diskoHermes}/bin/disko-hermes";
+    };
     pre-pr-verify = {
       type = "app";
       program = "${prePrVerify}/bin/pre-pr-verify";

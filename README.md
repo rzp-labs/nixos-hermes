@@ -191,9 +191,11 @@ workaround, live in [`AGENTS.md`](AGENTS.md#first-install).
 ## Applying the Changes
 
 There is no automated deployment step yet. For host-affecting feature branches,
-use the branch itself as the deployment artifact:
+use the branch as a temporary validation artifact only; persistent switches use
+the reviewed, merged, published remote flake unless an operator explicitly
+authorizes otherwise:
 
-1. Push the branch with `but push` so a remote flake ref exists.
+1. Push the branch with `but push` so a remote flake ref exists for review and temporary validation.
 2. Run local pre-host validation from a clean checkout: `nix flake check
    --no-build`, `nixos-rebuild dry-build`, and, for unit/runtime changes,
    `nixos-rebuild dry-activate`.
