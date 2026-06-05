@@ -31,7 +31,7 @@ nixos-hermes/
 │   └── pre-commit.nix                   # git-hooks.nix hook config (dev shell + pre-commit-check)
 ├── apps/
 │   └── default.nix                      # flake apps: nixos-anywhere, disko, *-smoke wrappers
-├── flake.nix                            # thin manifest: inputs/outputs, host definition, wiring
+├── flake.nix                            # thin manifest: inputs/outputs; host modules selected from Den
 ├── .github/workflows/flakehub-publish-rolling.yml # CI: publish to FlakeHub on push to main
 ├── .sops.yaml                           # sops encryption policy (age)
 ├── .agents/                             # committed local agent skills (GitButler workflow)
