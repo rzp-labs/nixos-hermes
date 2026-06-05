@@ -74,6 +74,11 @@ let
     "den/hosts/nixos-hermes/shared/home-manager.nix"
     "den/hosts/nixos-hermes/shared/users.nix"
   ];
+  allHostModulesUnderDen = builtins.all (
+    path: builtins.substring 0 23 path == "den/hosts/nixos-hermes/"
+  ) host.moduleImports;
+  legacyHostsRootExists = builtins.pathExists (./../.. + "/hosts");
+  legacyModulesRootExists = builtins.pathExists (./../.. + "/modules");
 in
 pkgs.runCommand "den-model-surface" { } ''
   set -eu
@@ -85,6 +90,9 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${builtins.concatStringsSep "," host.platformModules}' = '${builtins.concatStringsSep "," expectedPlatformModules}'
   test '${builtins.concatStringsSep "," host.serviceModules}' = '${builtins.concatStringsSep "," expectedServiceModules}'
   test '${builtins.concatStringsSep "," host.sharedModules}' = '${builtins.concatStringsSep "," expectedSharedModules}'
+  test '${boolString allHostModulesUnderDen}' = 'true'
+  test '${boolString legacyHostsRootExists}' = 'false'
+  test '${boolString legacyModulesRootExists}' = 'false'
   test '${host.nixpkgsHostPlatform}' = 'x86_64-linux'
   test '${host.hostId}' = '52dd4e5a'
   test '${host.stateVersion}' = '25.05'
