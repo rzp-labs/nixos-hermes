@@ -39,7 +39,6 @@ nixos-hermes/
 │   └── hermes-secrets.yaml              # never commit; encrypt before use
 ├── hosts/
 │   └── hermes/
-│       ├── default.nix                  # host entry: imports only; identity rendered from Den
 │       ├── disk-config.nix              # disko layout (imported; generates fileSystems.*)
 │       ├── hardware.nix                 # boot, initrd, kernel, GPU, ZFS services (filesystems via disko)
 │       ├── provision.nix                # host-specific activation scripts (one-shot provisioning + recurring refresh)
@@ -311,15 +310,17 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
   `let`. Do not define them in the file-level `let` and rely on Nix laziness to
   avoid Darwin evaluation.
 
-### `hosts/hermes/default.nix`
+### Host module graph
 
-*Host entry point.*
+The host no longer has a `hosts/hermes/default.nix` entrypoint. `flake.nix`
+maps `den.hosts.x86_64-linux.nixos-hermes.moduleImports` into the NixOS module
+list. The Den host entity categorizes that graph as hardware, storage, secrets,
+platform, service, and shared modules.
 
-- Contains the host import list only. Machine-specific identity constants
-  (`hostName`, `hostId`, `stateVersion`, `hostPlatform`) are Den host facts in
-  `den/entities.nix` and are rendered through the Den host aspect.
-- Do not re-add identity/system baseline options here; that would create a
-  duplicate owner with Den.
+- Do not re-add a host entrypoint import list under `hosts/hermes/default.nix`.
+- Add new host module files to the appropriate Den host graph category in
+  `den/entities.nix`, then extend eval/VM proof where the module has
+  VM-safe behavior.
 
 ### `hosts/hermes/hardware.nix`
 

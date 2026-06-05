@@ -62,26 +62,30 @@
       treefmt-nix = llm-agents.inputs.treefmt-nix;
     in
     {
-      nixosConfigurations.nixos-hermes = nixpkgs.lib.nixosSystem {
-        system = self.denModel.den.hosts.x86_64-linux.nixos-hermes.nixpkgsHostPlatform;
-        specialArgs = {
-          inherit
-            inputs
-            nixpkgs-llama
-            llm-agents
-            llm-agents-gitbutler
-            ;
+      nixosConfigurations.nixos-hermes =
+        let
+          denHost = self.denModel.den.hosts.x86_64-linux.nixos-hermes;
+        in
+        nixpkgs.lib.nixosSystem {
+          system = denHost.nixpkgsHostPlatform;
+          specialArgs = {
+            inherit
+              inputs
+              nixpkgs-llama
+              llm-agents
+              llm-agents-gitbutler
+              ;
+          };
+          modules = [
+            determinate.nixosModules.default
+            sops-nix.nixosModules.sops
+            disko.nixosModules.default
+            home-manager.nixosModules.home-manager
+            hermes-agent.nixosModules.default
+            denHost.mainModule
+          ]
+          ++ map (path: ./. + "/${path}") denHost.moduleImports;
         };
-        modules = [
-          determinate.nixosModules.default
-          sops-nix.nixosModules.sops
-          disko.nixosModules.default
-          home-manager.nixosModules.home-manager
-          hermes-agent.nixosModules.default
-          self.denModel.den.hosts.x86_64-linux.nixos-hermes.mainModule
-          ./hosts/hermes
-        ];
-      };
 
       # Expose `nix fmt` for all dev systems.
       # Formats Nix files with nixfmt-rfc-style + deadnix (from ./treefmt.nix).

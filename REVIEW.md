@@ -18,11 +18,12 @@ In `flake.nix`, that output is assembled with `nixpkgs.lib.nixosSystem`. Its `sy
 self.denModel.den.hosts.x86_64-linux.nixos-hermes.nixpkgsHostPlatform
 ```
 
-Its module list includes the Den-rendered host module first, followed by the host import tree:
+Its module list includes the Den-rendered host module first, followed by the
+Den-owned flattened host module graph:
 
 ```nix
 self.denModel.den.hosts.x86_64-linux.nixos-hermes.mainModule
-./hosts/hermes
+++ map (path: ./. + "/${path}") self.denModel.den.hosts.x86_64-linux.nixos-hermes.moduleImports
 ```
 
 So Den is not a separate deployment output. Den contributes rendered NixOS/Home Manager configuration into the normal NixOS deployment output.
@@ -89,9 +90,11 @@ den.aspects.nixos-hermes.os
 
 That aspect emits NixOS and Home Manager options consumed by the host output.
 
-## What remains native NixOS
+## Native NixOS modules selected by Den
 
-The following remain native host/module files and are still imported through `hosts/hermes/default.nix`:
+The following files remain native NixOS modules, but their inclusion is now
+selected by the Den host graph in `den/entities.nix`. There is no longer a
+`hosts/hermes/default.nix` entrypoint controlling the host import list.
 
 - hardware, boot, kernel, GPU, and ZFS service options:
   - `hosts/hermes/hardware.nix`
@@ -117,9 +120,20 @@ The following remain native host/module files and are still imported through `ho
 
 ## Current module ownership
 
-### `hosts/hermes/default.nix`
+### `den/entities.nix`
 
-Import list only. Host identity is no longer declared here; it is rendered from Den.
+Owns the host module graph categories used by `flake.nix`:
+
+- `hardwareModules`
+- `storageModules`
+- `secretModules`
+- `platformModules`
+- `serviceModules`
+- `sharedModules`
+- flattened `moduleImports`
+
+This is the current host instantiation boundary: `flake.nix` maps these Den
+paths into NixOS modules.
 
 ### `modules/system.nix`
 
@@ -194,7 +208,8 @@ The VM intentionally does not prove real hardware, real SOPS secrets, cloud enro
 nix build .#nixosConfigurations.nixos-hermes.config.system.build.toplevel
 ```
 
-This builds the real host system closure with the Den-rendered baseline and native host modules.
+This builds the real host system closure with the Den-rendered baseline and the
+Den-selected native module graph.
 
 ### Full structural flake check
 
@@ -226,4 +241,4 @@ For a Den-related review, useful files are:
 5. `tests/eval/den-model-surface.nix` — pure model assertions.
 6. `tests/default.nix` — VM assertions.
 7. `AGENTS.md` — agent-facing ownership and operational rules.
-8. `ARCHITECTURE.md` — target Den architecture direction.
+8. `ARCHITECTURE.md` — Den architecture vocabulary and direction.

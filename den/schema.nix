@@ -10,19 +10,43 @@ in
         moduleImports = lib.mkOption {
           type = pathList;
           default = [ ];
-          description = "Host module imports mirrored from the current NixOS entrypoint.";
+          description = "Flattened Den-owned host module graph consumed by flake.nix.";
+        };
+
+        hardwareModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Host hardware, boot, kernel, GPU, and physical-machine modules.";
+        };
+
+        storageModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Host storage layout modules such as Disko/ZFS layout.";
+        };
+
+        secretModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Host secret binding modules such as sops-nix bindings.";
+        };
+
+        platformModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Host platform/substrate modules such as provisioning and virtualisation.";
         };
 
         serviceModules = lib.mkOption {
           type = pathList;
           default = [ ];
-          description = "Host-owned service module files currently imported by the host entrypoint.";
+          description = "Host runtime service modules selected by the Den host graph.";
         };
 
         sharedModules = lib.mkOption {
           type = pathList;
           default = [ ];
-          description = "Shared module files currently imported by the host entrypoint.";
+          description = "Shared NixOS modules selected by the Den host graph.";
         };
 
         nixpkgsHostPlatform = lib.mkOption {

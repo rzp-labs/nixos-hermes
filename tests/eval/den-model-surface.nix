@@ -38,12 +38,25 @@ let
     "hosts/hermes/agentmemory.nix"
     "hosts/hermes/netdata.nix"
     "hosts/hermes/omp-auth-gateway.nix"
+    "modules/hermes-agent.nix"
+    "modules/hermes-plugins.nix"
     "modules/system.nix"
     "modules/packages.nix"
     "modules/home-manager.nix"
-    "modules/hermes-agent.nix"
-    "modules/hermes-plugins.nix"
     "modules/users.nix"
+  ];
+  expectedHardwareModules = [
+    "hosts/hermes/hardware.nix"
+  ];
+  expectedStorageModules = [
+    "hosts/hermes/disk-config.nix"
+  ];
+  expectedSecretModules = [
+    "hosts/hermes/sops.nix"
+  ];
+  expectedPlatformModules = [
+    "hosts/hermes/provision.nix"
+    "hosts/hermes/virtualisation.nix"
   ];
   expectedServiceModules = [
     "hosts/hermes/llama-server.nix"
@@ -66,6 +79,10 @@ pkgs.runCommand "den-model-surface" { } ''
   set -eu
   test '${host.name}' = 'nixos-hermes'
   test '${builtins.concatStringsSep "," host.moduleImports}' = '${builtins.concatStringsSep "," expectedModuleImports}'
+  test '${builtins.concatStringsSep "," host.hardwareModules}' = '${builtins.concatStringsSep "," expectedHardwareModules}'
+  test '${builtins.concatStringsSep "," host.storageModules}' = '${builtins.concatStringsSep "," expectedStorageModules}'
+  test '${builtins.concatStringsSep "," host.secretModules}' = '${builtins.concatStringsSep "," expectedSecretModules}'
+  test '${builtins.concatStringsSep "," host.platformModules}' = '${builtins.concatStringsSep "," expectedPlatformModules}'
   test '${builtins.concatStringsSep "," host.serviceModules}' = '${builtins.concatStringsSep "," expectedServiceModules}'
   test '${builtins.concatStringsSep "," host.sharedModules}' = '${builtins.concatStringsSep "," expectedSharedModules}'
   test '${host.nixpkgsHostPlatform}' = 'x86_64-linux'

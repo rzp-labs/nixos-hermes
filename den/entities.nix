@@ -8,121 +8,131 @@ let
   denPoc = host.users.den-poc;
 in
 {
-  den.hosts.x86_64-linux.nixos-hermes = {
-    moduleImports = [
-      "hosts/hermes/hardware.nix"
-      "hosts/hermes/disk-config.nix"
-      "hosts/hermes/sops.nix"
-      "hosts/hermes/provision.nix"
-      "hosts/hermes/virtualisation.nix"
-      "hosts/hermes/llama-server.nix"
-      "hosts/hermes/hindsight-embed.nix"
-      "hosts/hermes/hindsight-memory.nix"
-      "hosts/hermes/agentmemory.nix"
-      "hosts/hermes/netdata.nix"
-      "hosts/hermes/omp-auth-gateway.nix"
-      "modules/system.nix"
-      "modules/packages.nix"
-      "modules/home-manager.nix"
-      "modules/hermes-agent.nix"
-      "modules/hermes-plugins.nix"
-      "modules/users.nix"
-    ];
-
-    serviceModules = [
-      "hosts/hermes/llama-server.nix"
-      "hosts/hermes/hindsight-embed.nix"
-      "hosts/hermes/hindsight-memory.nix"
-      "hosts/hermes/agentmemory.nix"
-      "hosts/hermes/netdata.nix"
-      "hosts/hermes/omp-auth-gateway.nix"
-      "modules/hermes-agent.nix"
-      "modules/hermes-plugins.nix"
-    ];
-
-    sharedModules = [
-      "modules/system.nix"
-      "modules/packages.nix"
-      "modules/home-manager.nix"
-      "modules/users.nix"
-    ];
-
-    nixpkgsHostPlatform = "x86_64-linux";
-    hostId = "52dd4e5a";
-    stateVersion = "25.05";
-    trustedUsers = [ "admin" ];
-    timeZone = "America/Phoenix";
-    defaultLocale = "en_US.UTF-8";
-    consoleKeyMap = "us";
-    systemPackages = [
-      "curl"
-      "wget"
-      "git"
-      "man"
-      "htop"
-      "iotop"
-      "tree"
-      "jq"
-      "python3"
-      "ripgrep"
-      "unzip"
-      "gh"
-      "bun"
-      "fh"
-      "repowise"
-      "repowise-nix"
-      "llm-agents.cli-proxy-api"
-      "llm-agents.but"
-      "uv"
-    ];
-    storage.zfs = true;
-
-    users.root = {
-      sshAuthorizedKeys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOQ0xpYd/EJnMyHW36xmWodb0DPoMHf4LpQAl7xheMRE"
+  den.hosts.x86_64-linux.nixos-hermes =
+    let
+      hardwareModules = [
+        "hosts/hermes/hardware.nix"
       ];
-    };
-
-    users.admin = {
-      normalUser = true;
-      description = "System Admin";
-      hasHomeManagerConfig = true;
-      home = "/home/admin";
-      createHome = true;
-      homeMode = "700";
-      extraGroups = [
-        "wheel"
-        "networkmanager"
-        "hermes"
+      storageModules = [
+        "hosts/hermes/disk-config.nix"
       ];
-      sshAuthorizedKeys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG3neF+6qsDFb1pwr06mdW0mqMcxquAGNsjbGiG/Rj23"
+      secretModules = [
+        "hosts/hermes/sops.nix"
       ];
-      classes = [ "homeManager" ];
-    };
-
-    users.hermes = {
-      description = "Hermes account";
-      hasHomeManagerConfig = true;
-      sshAuthorizedKeys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID0inarJ3Em+01Y22ahDmJkbhevhwuFFrWyIEl0CjkzE"
-        "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBN6C8GPyeaAKWwkSqNXzDDQEzeGQ21IWGhAa+xFqNIHlQ7uDNA/9wc8A4tXO3ckp7seY+84aXAAyCQyfrrmKSbQ= #ssh.id"
-        "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCBs4KwCYyBZxsb02nyw9tRMsgOtfBuyM3mBh4varuvKc4JO4rzN1Iq2cXHyy0ttYIaDg52iPWlTM+O6pdpvVcE= #ssh.id"
-        "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNWfcMlHqWVodM+9A5ZnVEvw7zkDJMHW2cUw4Ru4v+8a3ot+QHH038uLkTl95SIL5XaKslAqe+gyqcZ4X6BPhtA= #ssh.id"
+      platformModules = [
+        "hosts/hermes/provision.nix"
+        "hosts/hermes/virtualisation.nix"
       ];
-      classes = [ "homeManager" ];
-    };
+      serviceModules = [
+        "hosts/hermes/llama-server.nix"
+        "hosts/hermes/hindsight-embed.nix"
+        "hosts/hermes/hindsight-memory.nix"
+        "hosts/hermes/agentmemory.nix"
+        "hosts/hermes/netdata.nix"
+        "hosts/hermes/omp-auth-gateway.nix"
+        "modules/hermes-agent.nix"
+        "modules/hermes-plugins.nix"
+      ];
+      sharedModules = [
+        "modules/system.nix"
+        "modules/packages.nix"
+        "modules/home-manager.nix"
+        "modules/users.nix"
+      ];
+    in
+    {
+      inherit
+        hardwareModules
+        storageModules
+        secretModules
+        platformModules
+        serviceModules
+        sharedModules
+        ;
+      moduleImports =
+        hardwareModules
+        ++ storageModules
+        ++ secretModules
+        ++ platformModules
+        ++ serviceModules
+        ++ sharedModules;
 
-    # VM-only fixture used to prove same-user mixed Den/native Home Manager
-    # migration. It is not production inventory.
-    users.den-poc = {
-      normalUser = true;
-      hasHomeManagerConfig = true;
-      home = "/home/den-poc";
-      createHome = true;
-      classes = [ "homeManager" ];
+      nixpkgsHostPlatform = "x86_64-linux";
+      hostId = "52dd4e5a";
+      stateVersion = "25.05";
+      trustedUsers = [ "admin" ];
+      timeZone = "America/Phoenix";
+      defaultLocale = "en_US.UTF-8";
+      consoleKeyMap = "us";
+      systemPackages = [
+        "curl"
+        "wget"
+        "git"
+        "man"
+        "htop"
+        "iotop"
+        "tree"
+        "jq"
+        "python3"
+        "ripgrep"
+        "unzip"
+        "gh"
+        "bun"
+        "fh"
+        "repowise"
+        "repowise-nix"
+        "llm-agents.cli-proxy-api"
+        "llm-agents.but"
+        "uv"
+      ];
+      storage.zfs = true;
+
+      users.root = {
+        sshAuthorizedKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOQ0xpYd/EJnMyHW36xmWodb0DPoMHf4LpQAl7xheMRE"
+        ];
+      };
+
+      users.admin = {
+        normalUser = true;
+        description = "System Admin";
+        hasHomeManagerConfig = true;
+        home = "/home/admin";
+        createHome = true;
+        homeMode = "700";
+        extraGroups = [
+          "wheel"
+          "networkmanager"
+          "hermes"
+        ];
+        sshAuthorizedKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG3neF+6qsDFb1pwr06mdW0mqMcxquAGNsjbGiG/Rj23"
+        ];
+        classes = [ "homeManager" ];
+      };
+
+      users.hermes = {
+        description = "Hermes account";
+        hasHomeManagerConfig = true;
+        sshAuthorizedKeys = [
+          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID0inarJ3Em+01Y22ahDmJkbhevhwuFFrWyIEl0CjkzE"
+          "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBN6C8GPyeaAKWwkSqNXzDDQEzeGQ21IWGhAa+xFqNIHlQ7uDNA/9wc8A4tXO3ckp7seY+84aXAAyCQyfrrmKSbQ= #ssh.id"
+          "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCBs4KwCYyBZxsb02nyw9tRMsgOtfBuyM3mBh4varuvKc4JO4rzN1Iq2cXHyy0ttYIaDg52iPWlTM+O6pdpvVcE= #ssh.id"
+          "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNWfcMlHqWVodM+9A5ZnVEvw7zkDJMHW2cUw4Ru4v+8a3ot+QHH038uLkTl95SIL5XaKslAqe+gyqcZ4X6BPhtA= #ssh.id"
+        ];
+        classes = [ "homeManager" ];
+      };
+
+      # VM-only fixture used to prove same-user mixed Den/native Home Manager
+      # migration. It is not production inventory.
+      users.den-poc = {
+        normalUser = true;
+        hasHomeManagerConfig = true;
+        home = "/home/den-poc";
+        createHome = true;
+        classes = [ "homeManager" ];
+      };
     };
-  };
 
   den.aspects.nixos-hermes.os =
     { lib, pkgs, ... }:
