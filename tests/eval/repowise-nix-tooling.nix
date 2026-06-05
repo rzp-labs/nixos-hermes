@@ -18,6 +18,7 @@ let
   );
   adminHome = hostConfig.home-manager.users.admin;
   adminHomePackages = builtins.concatStringsSep "\n" (map toString adminHome.home.packages);
+  adminHomePackageNames = builtins.concatStringsSep "\n" (map (pkg: pkg.name or "") adminHome.home.packages);
   adminHomeSessionPath = builtins.concatStringsSep "\n" adminHome.home.sessionPath;
   adminBashInit = adminHome.programs.bash.initExtra;
 in
@@ -48,7 +49,7 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   ('${hostPkgs.llm-agents.cli-proxy-api}/bin/cli-proxy-api' --version 2>&1 || true) | grep -q -- 'CLIProxyAPI Version: 7.1.39'
   test -f '${../../packages/repowise-nix/flake.nix}'
   test -f '${../../packages/repowise-nix/patches/repowise-nix-language-support.patch}'
-  grep -q -- 'inputs.repowise-nix.packages' '${../../den/hosts/nixos-hermes/shared/packages.nix}'
+  grep -q -- 'inputs.repowise-nix.packages' '${../../den/entities.nix}'
   test -x '${hostPkgs.repowise-nix}/bin/repowise-nix'
   grep -q -- 'REPOWISE_DISABLE_EDITOR_SETUP' '${hostPkgs.repowise}/${hostPkgs.python313.sitePackages}/repowise/cli/editor_setup.py'
   grep -q -- 'unset PYTHONPATH' '${hostPkgs.repowise}/bin/repowise'
@@ -91,8 +92,8 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   grep -q -- '${hostPkgs.nodejs}' <<'EOF'
   ${adminHomePackages}
   EOF
-  grep -q -- '${hostPkgs.llm-agents.omp}' <<'EOF'
-  ${adminHomePackages}
+  grep -q -- 'omp-15.7.6' <<'EOF'
+  ${adminHomePackageNames}
   EOF
   grep -q -- '.vite-plus/bin' <<'EOF'
   ${adminHomeSessionPath}

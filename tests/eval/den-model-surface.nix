@@ -36,7 +36,6 @@ let
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
-    "den/hosts/nixos-hermes/shared/packages.nix"
   ];
   expectedHardwareModules = [ ];
   expectedStorageModules = [
@@ -54,9 +53,7 @@ let
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
-  expectedSharedModules = [
-    "den/hosts/nixos-hermes/shared/packages.nix"
-  ];
+  expectedSharedModules = [ ];
   allHostModulesUnderDen = builtins.all (
     path: builtins.substring 0 23 path == "den/hosts/nixos-hermes/"
   ) host.moduleImports;

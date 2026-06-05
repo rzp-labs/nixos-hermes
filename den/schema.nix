@@ -85,6 +85,12 @@ in
           description = "Host baseline package attribute names.";
         };
 
+        nixpkgs.allowedUnfree = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Unfree package names explicitly allowed for this host.";
+        };
+
         trustedUsers = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
