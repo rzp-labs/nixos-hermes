@@ -382,6 +382,24 @@ in
           description = "Hermes GitHub credential refresh provisioning facts.";
         };
 
+        services.hindsightMemory.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether the retired Hindsight memory substrate is selected for Hermes.";
+        };
+
+        services.hindsightMemory.providerConfig = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Provider configuration rendered to $HERMES_HOME/hindsight/config.json when Hindsight is enabled.";
+        };
+
+        services.hindsightMemory.activationAfter = lib.mkOption {
+          type = pathList;
+          default = [ "hermes-agent-setup" ];
+          description = "Activation script dependencies for Hindsight provider config refresh.";
+        };
+
         secrets.defaultSopsFile = lib.mkOption {
           type = lib.types.str;
           description = "Repository-relative default SOPS file for this host.";

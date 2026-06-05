@@ -30,7 +30,6 @@ let
     "den/hosts/nixos-hermes/storage/disk-config.nix"
     "den/hosts/nixos-hermes/services/llama-server.nix"
     "den/hosts/nixos-hermes/services/hindsight-embed.nix"
-    "den/hosts/nixos-hermes/services/hindsight-memory.nix"
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
@@ -46,7 +45,6 @@ let
   expectedServiceModules = [
     "den/hosts/nixos-hermes/services/llama-server.nix"
     "den/hosts/nixos-hermes/services/hindsight-embed.nix"
-    "den/hosts/nixos-hermes/services/hindsight-memory.nix"
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
@@ -123,6 +121,13 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.platform.provisioning.githubAuth.secretName}' = 'hermes-env'
   test '${host.platform.provisioning.githubAuth.tokenVariable}' = 'GITHUB_TOKEN'
   test '${host.platform.provisioning.githubAuth.username}' = 'yui-hermes'
+  test '${boolString host.services.hindsightMemory.enable}' = 'false'
+  test '${builtins.concatStringsSep "," host.services.hindsightMemory.activationAfter}' = 'hermes-agent-setup'
+  test '${host.services.hindsightMemory.providerConfig.mode}' = 'local_external'
+  test '${host.services.hindsightMemory.providerConfig.api_url}' = 'http://127.0.0.1:8888'
+  test '${host.services.hindsightMemory.providerConfig.bank_id}' = 'hermes'
+  test '${host.services.hindsightMemory.providerConfig.bank_id_template}' = 'hermes-{profile}'
+  test '${host.services.hindsightMemory.providerConfig.budget}' = 'mid'
   test '${host.secrets.defaultSopsFile}' = 'den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml'
   test '${host.secrets.ageKeyFile}' = '/etc/secrets/age.key'
   test -z '${builtins.concatStringsSep "," host.secrets.ageSshKeyPaths}'
