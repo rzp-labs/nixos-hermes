@@ -31,7 +31,7 @@ in
     hostDiskoConfig = pkgs.writeText "nixos-hermes-disko.nix" ''
       { ... }:
       {
-        disko.devices = ${builtins.toJSON hostDiskoDevices};
+        disko.devices = ${lib.generators.toPretty { } hostDiskoDevices};
       }
     '';
     diskoHermes = pkgs.writeShellApplication {
