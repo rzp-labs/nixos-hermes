@@ -115,9 +115,18 @@ let
     { lib, ... }:
     {
       imports = [
+        sops-nix.nixosModules.sops
         home-manager.nixosModules.home-manager
         denHost.mainModule
       ];
+
+      # Den renders the real host's SOPS surface. This VM smoke proves VM-safe
+      # Den-rendered host/user behavior, not real secret decryption, so keep
+      # sops-nix available while preventing real host secret activation.
+      sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
+      sops.age.sshKeyPaths = lib.mkForce [ ];
+      sops.defaultSopsFile = lib.mkForce testSecretsFile;
+      sops.secrets = lib.mkForce { };
 
       # The real host creates some groups via imported service modules. This VM
       # declares host-local group targets directly so user assertions stay

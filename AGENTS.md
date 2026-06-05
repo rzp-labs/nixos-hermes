@@ -40,7 +40,6 @@ nixos-hermes/
 └── den/hosts/nixos-hermes/              # Den-owned host modules and encrypted payloads
     ├── hardware/default.nix             # boot, initrd, kernel, GPU, ZFS services
     ├── storage/disk-config.nix          # disko layout (imported; generates fileSystems.*)
-    ├── secrets/sops.nix                 # sops-nix secret bindings
     ├── secrets/payload/                 # committed SOPS-encrypted files
     ├── platform/                        # activation/provisioning and virtualisation substrate
     ├── services/                        # host runtime services
@@ -80,7 +79,7 @@ nixos-hermes/
 - The committed encrypted secrets live under `den/hosts/nixos-hermes/secrets/payload/`.
 - The `sops age` key is `/etc/secrets/age.key` on the host. The corresponding public key is registered in `.sops.yaml`. Do not change the public key in `.sops.yaml` without re-encrypting every secret file.
 - `.secrets/hermes-secrets.yaml` is the plaintext template (`gitignored`). Workflow: edit locally → `sops --encrypt .secrets/hermes-secrets.yaml > den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml` → commit the encrypted file → never commit the plaintext.
-- When adding a new secret key: add it to `.secrets/hermes-secrets.yaml`, add the `sops.secrets.<name>` binding in `den/hosts/nixos-hermes/secrets/sops.nix`, then re-encrypt.
+- When adding a new secret key: add it to `.secrets/hermes-secrets.yaml`, add the binding metadata under `den.hosts.x86_64-linux.nixos-hermes.secrets.bindings` in `den/entities.nix`, then re-encrypt.
 
 ### Users
 
@@ -279,8 +278,9 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 - Do not add custom fleet/environment topology, quirks that drive production
   config, or host-service migrations here without a follow-up issue and eval/VM
   proof. Current Den-rendered production scope is users, SSH keys, Home Manager,
-  and host/system baseline. Hardware, Disko/ZFS, SOPS/secrets, virtualization,
-  and service runtime modules remain native host imports.
+  host/system baseline, SOPS/secrets, virtualization, and install-time Disko
+  path facts. Hardware, Disko/ZFS layout, provisioning scripts, package overlay
+  definitions, and service runtime modules remain native host imports.
 
 ### `checks/pre-commit.nix`
 
@@ -340,12 +340,15 @@ After first install:
   - The partition/pool sections are effectively reference documentation.
   - Changing them does not reformat disks, but the `mountpoint` attributes remain live: they control mounting on every rebuild.
 
-### `den/hosts/nixos-hermes/secrets/sops.nix`
+### Den secret facts
 
-*Maps SOPS-encrypted files to runtime paths.*
+*Maps SOPS-encrypted files to runtime paths from Den.*
 
-- Lives alongside `secrets/` so that `./secrets/...` paths resolve correctly.
-- The `sops age` key path (`/etc/secrets/age.key`) must not change without updating this file.
+- Facts live under `den.hosts.x86_64-linux.nixos-hermes.secrets`.
+- `den.aspects.nixos-hermes.os` renders `sops.defaultSopsFile`, age identity settings, and `sops.secrets`.
+- Committed encrypted payloads live under `den/hosts/nixos-hermes/secrets/payload/`.
+
+- The `sops age` key path (`/etc/secrets/age.key`) is modeled by Den and must not change without updating the host secret facts.
 
 ### Den platform virtualisation facts
 

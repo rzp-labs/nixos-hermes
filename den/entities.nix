@@ -16,9 +16,7 @@ in
       storageModules = [
         "den/hosts/nixos-hermes/storage/disk-config.nix"
       ];
-      secretModules = [
-        "den/hosts/nixos-hermes/secrets/sops.nix"
-      ];
+      secretModules = [ ];
       platformModules = [
         "den/hosts/nixos-hermes/platform/provision.nix"
       ];
@@ -103,6 +101,50 @@ in
           "virtiofsd"
         ];
       };
+      secrets = {
+        defaultSopsFile = "den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml";
+        ageKeyFile = "/etc/secrets/age.key";
+        # The SSH host key is itself a sops-managed secret; using it as an age
+        # identity creates a circular dependency. Use only the age key file.
+        ageSshKeyPaths = [ ];
+        bindings = {
+          ssh_host_ed25519_key = {
+            sopsFile = "den/hosts/nixos-hermes/secrets/payload/ssh_host_ed25519_key.enc";
+            format = "binary";
+            owner = "root";
+            mode = "0600";
+            path = "/etc/ssh/ssh_host_ed25519_key";
+          };
+          "hermes-env" = {
+            owner = "hermes";
+            mode = "0400";
+          };
+          omp-auth-broker-token = {
+            owner = "admin";
+            mode = "0400";
+          };
+          cliproxyapi-key = {
+            sopsFile = "den/hosts/nixos-hermes/secrets/payload/cliproxyapi-key.enc";
+            format = "binary";
+            owner = "agentmemory";
+            group = "agentmemory";
+            mode = "0400";
+          };
+          hermes-soul-md = {
+            sopsFile = "den/hosts/nixos-hermes/secrets/payload/soul.md";
+            format = "binary";
+            owner = "hermes";
+            mode = "0440";
+          };
+          netdata-claim-conf = {
+            sopsFile = "den/hosts/nixos-hermes/secrets/payload/netdata-claim.conf";
+            format = "binary";
+            owner = "root";
+            group = "netdata";
+            mode = "0440";
+          };
+        };
+      };
 
       users.root = {
         sshAuthorizedKeys = [
@@ -182,6 +224,19 @@ in
       packageByName =
         name: lib.attrByPath (lib.splitString "." name) (throw "Unknown Den system package ${name}") pkgs;
       platformVirtualisationPackages = builtins.map packageByName host.platform.virtualisation.packages;
+      repoPath = path: ../. + "/${path}";
+      renderSecret =
+        _name: secret:
+        lib.filterAttrs (_: value: value != null) {
+          sopsFile = if secret.sopsFile == null then null else repoPath secret.sopsFile;
+          inherit (secret)
+            format
+            owner
+            group
+            mode
+            path
+            ;
+        };
     in
     {
       networking.hostName = host.name;
@@ -208,6 +263,11 @@ in
           type = "ed25519";
         }
       ];
+
+      sops.defaultSopsFile = repoPath host.secrets.defaultSopsFile;
+      sops.age.keyFile = host.secrets.ageKeyFile;
+      sops.age.sshKeyPaths = host.secrets.ageSshKeyPaths;
+      sops.secrets = lib.mapAttrs renderSecret host.secrets.bindings;
 
       services.dbus.implementation = "dbus";
       security.sudo.wheelNeedsPassword = false;

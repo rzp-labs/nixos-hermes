@@ -29,7 +29,6 @@ let
   expectedModuleImports = [
     "den/hosts/nixos-hermes/hardware/default.nix"
     "den/hosts/nixos-hermes/storage/disk-config.nix"
-    "den/hosts/nixos-hermes/secrets/sops.nix"
     "den/hosts/nixos-hermes/platform/provision.nix"
     "den/hosts/nixos-hermes/services/llama-server.nix"
     "den/hosts/nixos-hermes/services/hindsight-embed.nix"
@@ -50,9 +49,7 @@ let
   expectedStorageModules = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
   ];
-  expectedSecretModules = [
-    "den/hosts/nixos-hermes/secrets/sops.nix"
-  ];
+  expectedSecretModules = [ ];
   expectedPlatformModules = [
     "den/hosts/nixos-hermes/platform/provision.nix"
   ];
@@ -107,6 +104,14 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${boolString host.platform.virtualisation.libvirt.enable}' = 'true'
   test '${builtins.concatStringsSep "," host.platform.virtualisation.rootEquivalentGroups}' = 'docker,libvirtd'
   test '${builtins.concatStringsSep "," host.platform.virtualisation.packages}' = 'docker-compose,lazydocker,virtiofsd'
+  test '${host.secrets.defaultSopsFile}' = 'den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml'
+  test '${host.secrets.ageKeyFile}' = '/etc/secrets/age.key'
+  test -z '${builtins.concatStringsSep "," host.secrets.ageSshKeyPaths}'
+  test '${builtins.concatStringsSep "," (builtins.attrNames host.secrets.bindings)}' = 'cliproxyapi-key,hermes-env,hermes-soul-md,netdata-claim-conf,omp-auth-broker-token,ssh_host_ed25519_key'
+  test '${host.secrets.bindings.ssh_host_ed25519_key.path}' = '/etc/ssh/ssh_host_ed25519_key'
+  test '${host.secrets.bindings.ssh_host_ed25519_key.format}' = 'binary'
+  test '${host.secrets.bindings."hermes-env".owner}' = 'hermes'
+  test '${host.secrets.bindings.netdata-claim-conf.group}' = 'netdata'
   test '${admin.name}' = 'admin'
   test '${boolString admin.normalUser}' = 'true'
   test '${boolString admin.hasHomeManagerConfig}' = 'true'

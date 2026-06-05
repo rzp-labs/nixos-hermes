@@ -137,6 +137,63 @@ in
           default = [ ];
           description = "Host package names required by the virtualisation substrate.";
         };
+
+        secrets.defaultSopsFile = lib.mkOption {
+          type = lib.types.str;
+          description = "Repository-relative default SOPS file for this host.";
+        };
+
+        secrets.ageKeyFile = lib.mkOption {
+          type = lib.types.str;
+          description = "Host-local age identity file consumed by sops-nix.";
+        };
+
+        secrets.ageSshKeyPaths = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "SSH key paths allowed as age identities for sops-nix.";
+        };
+
+        secrets.bindings = lib.mkOption {
+          type = lib.types.attrsOf (
+            lib.types.submodule {
+              options = {
+                sopsFile = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "Repository-relative SOPS file override for this secret.";
+                };
+                format = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "sops-nix secret format override.";
+                };
+                owner = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "Runtime owner for the decrypted secret.";
+                };
+                group = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "Runtime group for the decrypted secret.";
+                };
+                mode = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "Runtime mode for the decrypted secret.";
+                };
+                path = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = "Runtime destination path for the decrypted secret.";
+                };
+              };
+            }
+          );
+          default = { };
+          description = "sops-nix secret binding metadata rendered for this host.";
+        };
       };
     }
   ];
