@@ -11,25 +11,25 @@ in
   den.hosts.x86_64-linux.nixos-hermes =
     let
       hardwareModules = [
-        "hosts/hermes/hardware.nix"
+        "den/hosts/nixos-hermes/hardware/default.nix"
       ];
       storageModules = [
-        "hosts/hermes/disk-config.nix"
+        "den/hosts/nixos-hermes/storage/disk-config.nix"
       ];
       secretModules = [
-        "hosts/hermes/sops.nix"
+        "den/hosts/nixos-hermes/secrets/sops.nix"
       ];
       platformModules = [
-        "hosts/hermes/provision.nix"
-        "hosts/hermes/virtualisation.nix"
+        "den/hosts/nixos-hermes/platform/provision.nix"
+        "den/hosts/nixos-hermes/platform/virtualisation.nix"
       ];
       serviceModules = [
-        "hosts/hermes/llama-server.nix"
-        "hosts/hermes/hindsight-embed.nix"
-        "hosts/hermes/hindsight-memory.nix"
-        "hosts/hermes/agentmemory.nix"
-        "hosts/hermes/netdata.nix"
-        "hosts/hermes/omp-auth-gateway.nix"
+        "den/hosts/nixos-hermes/services/llama-server.nix"
+        "den/hosts/nixos-hermes/services/hindsight-embed.nix"
+        "den/hosts/nixos-hermes/services/hindsight-memory.nix"
+        "den/hosts/nixos-hermes/services/agentmemory.nix"
+        "den/hosts/nixos-hermes/services/netdata.nix"
+        "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
         "modules/hermes-agent.nix"
         "modules/hermes-plugins.nix"
       ];

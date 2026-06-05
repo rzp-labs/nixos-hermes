@@ -224,7 +224,7 @@ in
       {
         imports = [
           hermesBaseModule
-          ../hosts/hermes/provision.nix
+          ../den/hosts/nixos-hermes/platform/provision.nix
         ];
       };
 

@@ -97,22 +97,22 @@ selected by the Den host graph in `den/entities.nix`. There is no longer a
 `hosts/hermes/default.nix` entrypoint controlling the host import list.
 
 - hardware, boot, kernel, GPU, and ZFS service options:
-  - `hosts/hermes/hardware.nix`
+  - `den/hosts/nixos-hermes/hardware/default.nix`
 - Disko/ZFS layout:
-  - `hosts/hermes/disk-config.nix`
+  - `den/hosts/nixos-hermes/storage/disk-config.nix`
 - SOPS secret bindings:
-  - `hosts/hermes/sops.nix`
+  - `den/hosts/nixos-hermes/secrets/sops.nix`
 - host activation/provisioning scripts:
-  - `hosts/hermes/provision.nix`
+  - `den/hosts/nixos-hermes/platform/provision.nix`
 - Docker/libvirt substrate:
-  - `hosts/hermes/virtualisation.nix`
+  - `den/hosts/nixos-hermes/platform/virtualisation.nix`
 - runtime service modules:
-  - `hosts/hermes/llama-server.nix`
-  - `hosts/hermes/hindsight-embed.nix`
-  - `hosts/hermes/hindsight-memory.nix`
-  - `hosts/hermes/agentmemory.nix`
-  - `hosts/hermes/netdata.nix`
-  - `hosts/hermes/omp-auth-gateway.nix`
+  - `den/hosts/nixos-hermes/services/llama-server.nix`
+  - `den/hosts/nixos-hermes/services/hindsight-embed.nix`
+  - `den/hosts/nixos-hermes/services/hindsight-memory.nix`
+  - `den/hosts/nixos-hermes/services/agentmemory.nix`
+  - `den/hosts/nixos-hermes/services/netdata.nix`
+  - `den/hosts/nixos-hermes/services/omp-auth-gateway.nix`
   - `modules/hermes-agent.nix`
   - `modules/hermes-plugins.nix`
 - package overlays and host package workarounds:
