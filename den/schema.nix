@@ -260,8 +260,15 @@ in
         };
 
         storage.diskoConfigPath = lib.mkOption {
-          type = lib.types.str;
-          description = "Repository-relative Disko configuration path for install-time tooling.";
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Repository-relative Disko configuration path when Disko is owned by a standalone file.";
+        };
+
+        storage.diskoDevices = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Disko devices rendered for this host from Den facts.";
         };
 
         platform.virtualisation.docker.enable = lib.mkOption {

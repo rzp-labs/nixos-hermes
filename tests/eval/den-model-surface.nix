@@ -27,11 +27,9 @@ let
   missingLabCategories = builtins.filter (name: !(builtins.hasAttr name lab)) requiredLabCategories;
 
   expectedModuleImports = [
-    "den/hosts/nixos-hermes/storage/disk-config.nix"
   ];
   expectedHardwareModules = [ ];
   expectedStorageModules = [
-    "den/hosts/nixos-hermes/storage/disk-config.nix"
   ];
   expectedSecretModules = [ ];
   expectedPlatformModules = [ ];
@@ -91,7 +89,13 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.hardware.cpuFreqGovernor}' = 'schedutil'
   test '${boolString host.hardware.zfsMaintenance.autoScrub}' = 'true'
   test '${boolString host.hardware.zfsMaintenance.trim}' = 'true'
-  test '${host.storage.diskoConfigPath}' = 'den/hosts/nixos-hermes/storage/disk-config.nix'
+  test '${nullableString host.storage.diskoConfigPath}' = 'null'
+  test '${host.storage.diskoDevices.disk.nvme0.device}' = '/dev/disk/by-id/nvme-eui.0025384751a0ee3b'
+  test '${host.storage.diskoDevices.disk.nvme1.device}' = '/dev/disk/by-id/nvme-eui.0025384841a151b4'
+  test '${host.storage.diskoDevices.zpool.rpool.mode}' = 'mirror'
+  test '${
+    host.storage.diskoDevices.zpool.rpool.datasets."data/hermes".mountpoint
+  }' = '/var/lib/hermes'
   test '${boolString host.platform.virtualisation.docker.enable}' = 'true'
   test '${host.platform.virtualisation.docker.storageDriver}' = 'zfs'
   test '${host.platform.virtualisation.docker.autoPruneDates}' = 'weekly'

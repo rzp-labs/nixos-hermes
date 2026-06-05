@@ -11,10 +11,16 @@
   system,
   nixos-anywhere,
   disko,
-  hostDiskoConfigPath,
+  hostDiskoDevices,
 }:
 let
   diskoPackage = disko.packages.${system}.disko;
+  hostDiskoConfig = pkgs.writeText "nixos-hermes-disko.nix" ''
+    { ... }:
+    {
+      disko.devices = builtins.fromJSON ${builtins.toJSON hostDiskoDevices};
+    }
+  '';
 in
 {
   nixos-anywhere = {
@@ -32,7 +38,7 @@ in
         name = "disko-hermes";
         runtimeInputs = [ diskoPackage ];
         text = ''
-          exec disko --mode disko ${lib.escapeShellArg hostDiskoConfigPath} "$@"
+          exec disko --mode disko ${hostDiskoConfig} "$@"
         '';
       }
     }/bin/disko-hermes";

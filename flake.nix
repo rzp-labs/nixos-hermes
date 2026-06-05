@@ -164,7 +164,7 @@
         import ./apps {
           inherit (nixpkgs) lib;
           inherit system nixos-anywhere disko;
-          hostDiskoConfigPath = self.denModel.den.hosts.x86_64-linux.nixos-hermes.storage.diskoConfigPath;
+          hostDiskoDevices = self.denModel.den.hosts.x86_64-linux.nixos-hermes.storage.diskoDevices;
           pkgs = nixpkgs.legacyPackages.${system};
         }
       );
