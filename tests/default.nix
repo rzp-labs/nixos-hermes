@@ -183,15 +183,15 @@ in
       ${assertAuthorizedKeys "admin" denAdmin.sshAuthorizedKeys}
       ${assertAuthorizedKeys "hermes" denHermes.sshAuthorizedKeys}
       machine.succeed("systemctl is-active --quiet home-manager-admin.service")
-      machine.succeed("runuser -u admin -- /home/admin/.nix-profile/bin/glow --version")
-      machine.succeed("runuser -u admin -- /home/admin/.nix-profile/bin/bat --version")
-      machine.succeed("runuser -u admin -- script -qec '/home/admin/.nix-profile/bin/yazi --version' /tmp/yazi-version >/dev/null 2>&1 && grep -qi 'yazi' /tmp/yazi-version")
-      machine.succeed("runuser -u admin -- /home/admin/.nix-profile/bin/omp --version")
+      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/glow --version")
+      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/bat --version")
+      machine.succeed("runuser -u admin -- script -qec '/etc/profiles/per-user/admin/bin/yazi --version' /tmp/yazi-version >/dev/null 2>&1 && grep -qi 'yazi' /tmp/yazi-version")
+      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/omp --version")
       machine.succeed("systemctl list-units --plain --state=active 'home-manager-*' | grep -F 'Home Manager environment for den-poc'")
-      machine.succeed("test -x /home/den-poc/.nix-profile/bin/glow")
-      machine.succeed("test -x /home/den-poc/.nix-profile/bin/bat")
-      machine.succeed("runuser -u den-poc -- /home/den-poc/.nix-profile/bin/glow --version")
-      machine.succeed("runuser -u den-poc -- /home/den-poc/.nix-profile/bin/bat --version")
+      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/glow")
+      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/bat")
+      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/glow --version")
+      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/bat --version")
     '';
   };
 
