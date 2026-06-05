@@ -96,8 +96,20 @@ let
   };
 
   denHost = denModel.den.hosts.x86_64-linux.nixos-hermes;
+  denRoot = denHost.users.root;
   denAdmin = denHost.users.admin;
+  denHermes = denHost.users.hermes;
   denPoc = denHost.users.den-poc;
+
+  assertAuthorizedKeys = user: keys: ''
+    machine.succeed("test -f /etc/ssh/authorized_keys.d/${user}")
+    machine.succeed("grep -cve '^$' /etc/ssh/authorized_keys.d/${user} | grep -qx ${toString (builtins.length keys)}")
+    ${builtins.concatStringsSep "\n" (
+      map (key: ''
+        machine.succeed("grep -Fx '${key}' /etc/ssh/authorized_keys.d/${user}")
+      '') keys
+    )}
+  '';
 
   denHostVmModule =
     { lib, ... }:
@@ -105,18 +117,6 @@ let
       imports = [
         home-manager.nixosModules.home-manager
         denHost.mainModule
-      ];
-      nixpkgs.overlays = lib.mkForce [
-        (_final: prev: {
-          repowise = prev.hello;
-          repowise-nix = prev.hello;
-          fh = prev.hello;
-          llm-agents = (prev.llm-agents or { }) // {
-            cli-proxy-api = prev.hello;
-            but = prev.hello;
-          };
-          vite-plus = prev.hello;
-        })
       ];
 
       # The real host creates some groups via imported service modules. This VM
@@ -163,10 +163,14 @@ in
       machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx hermes")
       machine.succeed("test -d /home/admin")
       machine.succeed("stat -c%a /home/admin | grep -qx 700")
-      machine.succeed("test -f /etc/ssh/authorized_keys.d/admin")
-      machine.succeed("grep -Fx '${builtins.head denAdmin.sshAuthorizedKeys}' /etc/ssh/authorized_keys.d/admin")
-      machine.succeed("test -f /etc/ssh/authorized_keys.d/hermes")
+      ${assertAuthorizedKeys "root" denRoot.sshAuthorizedKeys}
+      ${assertAuthorizedKeys "admin" denAdmin.sshAuthorizedKeys}
+      ${assertAuthorizedKeys "hermes" denHermes.sshAuthorizedKeys}
       machine.succeed("systemctl is-active --quiet home-manager-admin.service")
+      machine.succeed("runuser -u admin -- /home/admin/.nix-profile/bin/glow --version")
+      machine.succeed("runuser -u admin -- /home/admin/.nix-profile/bin/bat --version")
+      machine.succeed("runuser -u admin -- script -qec '/home/admin/.nix-profile/bin/yazi --version' /tmp/yazi-version >/dev/null 2>&1 && grep -qi 'yazi' /tmp/yazi-version")
+      machine.succeed("runuser -u admin -- /home/admin/.nix-profile/bin/omp --version")
       machine.succeed("systemctl list-units --plain --state=active 'home-manager-*' | grep -F 'Home Manager environment for den-poc'")
       machine.succeed("test -x /home/den-poc/.nix-profile/bin/glow")
       machine.succeed("test -x /home/den-poc/.nix-profile/bin/bat")

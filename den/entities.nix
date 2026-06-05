@@ -152,10 +152,8 @@ in
       };
     in
     let
-      # VM tests use the nixpkgs instance supplied by nixosTest, not the full
-      # host overlay stack. Fall back to hello there; the live host eval below
-      # proves the real overlaid package attrs resolve on nixos-hermes.
-      packageByName = name: lib.attrByPath (lib.splitString "." name) pkgs.hello pkgs;
+      packageByName =
+        name: lib.attrByPath (lib.splitString "." name) (throw "Unknown Den system package ${name}") pkgs;
     in
     {
       networking.hostName = host.name;

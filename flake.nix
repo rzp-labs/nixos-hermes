@@ -117,7 +117,7 @@
           linuxChecks =
             if system == "x86_64-linux" then
               let
-                vmTests = pkgs.callPackage ./tests {
+                vmTests = self.nixosConfigurations.nixos-hermes.pkgs.callPackage ./tests {
                   inherit
                     nixpkgs
                     sops-nix
