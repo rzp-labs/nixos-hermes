@@ -429,6 +429,94 @@ in
           description = "Hindsight retain/reflect LLM route facts for the retired memory substrate.";
         };
 
+        services.netdataMonitoring = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Whether the Netdata Cloud agent and local observe helper are enabled.";
+              };
+              packageVersion = lib.mkOption {
+                type = lib.types.str;
+                default = "2.10.3";
+                description = "Netdata package version override.";
+              };
+              packageSrcHash = lib.mkOption {
+                type = lib.types.str;
+                default = "sha256-ryX+C3zuY7vONPeB4ocXDPttU5aSYbj1ThTosCSxmys=";
+                description = "Netdata source hash for the package override.";
+              };
+              ndMcpVendorHash = lib.mkOption {
+                type = lib.types.str;
+                default = "sha256-jyCTp52Dc2IuRwzGT+sHFljO30oqAMfe3xVdEpV+R2c=";
+                description = "Vendor hash for the Netdata MCP bridge.";
+              };
+              goPluginVendorHash = lib.mkOption {
+                type = lib.types.str;
+                default = "sha256-HRe1bcVIQVzwPZnGlAK5A8AO1VTcjFajkPwBVdl4UIA=";
+                description = "Vendor hash for Netdata go.d plugins.";
+              };
+              cargoVendorHash = lib.mkOption {
+                type = lib.types.str;
+                default = "sha256-mxFpT95e+NMqjJOIRqM+yKHGQHfpWmIFHqFNiiiqXOY=";
+                description = "Cargo vendor hash for Netdata Rust crates.";
+              };
+              jfCargoVendorHash = lib.mkOption {
+                type = lib.types.str;
+                default = "sha256-6spr8WRt2G6tzaUQACxIcVMoDNKOFTg6rSPEOihMgLE=";
+                description = "Cargo vendor hash for Netdata jf crates.";
+              };
+              agentApiUrl = lib.mkOption {
+                type = lib.types.str;
+                default = "http://127.0.0.1:19999";
+                description = "Loopback Netdata agent API URL.";
+              };
+              bindTo = lib.mkOption {
+                type = lib.types.str;
+                default = "127.0.0.1";
+                description = "Local Netdata web/API bind address.";
+              };
+              disabledPlugins = lib.mkOption {
+                type = lib.types.attrsOf lib.types.str;
+                default = {
+                  freeipmi = "no";
+                  "logs-management" = "no";
+                };
+                description = "Netdata plugins disabled for this host.";
+              };
+              logAllowlist = lib.mkOption {
+                type = lib.types.listOf lib.types.str;
+                default = [
+                  "netdata.service"
+                  "hermes-agent.service"
+                  "agentmemory.service"
+                  "hindsight-embed.service"
+                  "omp-auth-gateway.service"
+                ];
+                description = "Units allowed by the bounded netdata-observe logs wrapper.";
+              };
+              logDefaultLines = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 120;
+                description = "Default bounded log line count.";
+              };
+              logMaxLines = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 500;
+                description = "Maximum bounded log line count.";
+              };
+              postgresSocketDir = lib.mkOption {
+                type = lib.types.str;
+                default = "/var/run/postgresql";
+                description = "PostgreSQL socket directory for the local Netdata collector.";
+              };
+            };
+          };
+          default = { };
+          description = "Netdata monitoring and bounded observe helper facts.";
+        };
+
         services.agentMemory = lib.mkOption {
           type = lib.types.submodule {
             options = {

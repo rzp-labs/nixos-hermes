@@ -28,7 +28,6 @@ let
 
   expectedModuleImports = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
-    "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
@@ -39,7 +38,6 @@ let
   expectedSecretModules = [ ];
   expectedPlatformModules = [ ];
   expectedServiceModules = [
-    "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
@@ -144,6 +142,17 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.services.agentMemory.llm.model}' = 'gpt-5.4-mini'
   test '${toString host.services.agentMemory.llm.timeoutMs}' = '120000'
   test '${host.services.agentMemory.llm.embeddingProvider}' = 'local'
+  test '${if host.services.netdataMonitoring.enable then "true" else "false"}' = 'true'
+  test '${host.services.netdataMonitoring.packageVersion}' = '2.10.3'
+  test '${host.services.netdataMonitoring.packageSrcHash}' = 'sha256-ryX+C3zuY7vONPeB4ocXDPttU5aSYbj1ThTosCSxmys='
+  test '${host.services.netdataMonitoring.agentApiUrl}' = 'http://127.0.0.1:19999'
+  test '${host.services.netdataMonitoring.bindTo}' = '127.0.0.1'
+  test '${host.services.netdataMonitoring.disabledPlugins.freeipmi}' = 'no'
+  test '${host.services.netdataMonitoring.disabledPlugins."logs-management"}' = 'no'
+  test '${builtins.concatStringsSep " " host.services.netdataMonitoring.logAllowlist}' = 'netdata.service hermes-agent.service agentmemory.service hindsight-embed.service omp-auth-gateway.service'
+  test '${toString host.services.netdataMonitoring.logDefaultLines}' = '120'
+  test '${toString host.services.netdataMonitoring.logMaxLines}' = '500'
+  test '${host.services.netdataMonitoring.postgresSocketDir}' = '/var/run/postgresql'
   test '${boolString host.services.hindsightMemory.llama.enable}' = 'false'
   test '${host.services.hindsightMemory.llama.modelPath}' = '/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf'
   test '${host.services.hindsightMemory.llama.host}' = '127.0.0.1'
