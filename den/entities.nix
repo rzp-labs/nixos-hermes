@@ -86,6 +86,7 @@ in
         "uv"
       ];
       storage.zfs = true;
+      storage.diskoConfigPath = "den/hosts/nixos-hermes/storage/disk-config.nix";
 
       users.root = {
         sshAuthorizedKeys = [

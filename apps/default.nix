@@ -4,14 +4,18 @@
 # lockfile pin as the NixOS modules. Linux-only operational smokes wrap shell
 # scripts under ../tools. Invoke with:
 #   nix run .#nixos-anywhere -- --flake .#nixos-hermes ...
-#   nix run .#disko -- --mode disko den/hosts/nixos-hermes/storage/disk-config.nix
+#   nix run .#disko-hermes
 {
   pkgs,
   lib,
   system,
   nixos-anywhere,
   disko,
+  hostDiskoConfigPath,
 }:
+let
+  diskoPackage = disko.packages.${system}.disko;
+in
 {
   nixos-anywhere = {
     type = "app";
@@ -19,7 +23,19 @@
   };
   disko = {
     type = "app";
-    program = "${disko.packages.${system}.disko}/bin/disko";
+    program = "${diskoPackage}/bin/disko";
+  };
+  disko-hermes = {
+    type = "app";
+    program = "${
+      pkgs.writeShellApplication {
+        name = "disko-hermes";
+        runtimeInputs = [ diskoPackage ];
+        text = ''
+          exec disko --mode disko ${lib.escapeShellArg hostDiskoConfigPath} "$@"
+        '';
+      }
+    }/bin/disko-hermes";
   };
 }
 // lib.optionalAttrs (system == "x86_64-linux") (

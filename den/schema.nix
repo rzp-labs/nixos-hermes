@@ -96,6 +96,11 @@ in
           default = false;
           description = "Whether current host configuration enables ZFS storage semantics.";
         };
+
+        storage.diskoConfigPath = lib.mkOption {
+          type = lib.types.str;
+          description = "Repository-relative Disko configuration path for install-time tooling.";
+        };
       };
     }
   ];
