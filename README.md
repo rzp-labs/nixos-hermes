@@ -89,16 +89,11 @@ nixos-hermes/
 ├── .sops.yaml                         # sops encryption rules (age keys)
 ├── .secrets/                          # gitignored — plaintext secrets (local only)
 │   └── hermes-secrets.yaml            # template; encrypt before committing
-├── hosts/
-│   └── hermes/
-│       ├── disk-config.nix            # disko layout (imported; generates fileSystems.*)
-│       ├── hardware.nix               # boot, initrd, kernel, GPU, ZFS services
-│       ├── sops.nix                   # SOPS secret bindings
-│       └── secrets/                   # encrypted secret files (committed)
-└── modules/
-    ├── system.nix                     # marker; baseline rendered from Den
-    ├── hermes-agent.nix               # hermes service declaration
-    └── users.nix                      # immutable-users flag; users/SSH rendered from Den
+└── den/
+    ├── default.nix                    # Den model entrypoint
+    ├── schema.nix                     # repo-local host/user schema
+    ├── entities.nix                   # host facts, module graph, and render aspects
+    └── hosts/nixos-hermes/            # Den-owned host modules and encrypted payloads
 ```
 
 ---
@@ -181,8 +176,8 @@ find extra-files -type f -exec shred -u {} +
 rm -rf extra-files
 ```
 
-This kexec's the target into the NixOS installer, runs disko from
-`den/hosts/nixos-hermes/storage/disk-config.nix` to partition and mount, installs, and reboots.
+This kexec's the target into the NixOS installer, runs Disko from the
+Den-declared host storage config path to partition and mount, installs, and reboots.
 The age key is seeded into `/etc/secrets/age.key` on the installed system so
 sops-nix can decrypt secrets on first activation.
 

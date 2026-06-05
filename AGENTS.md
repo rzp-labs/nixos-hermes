@@ -37,21 +37,14 @@ nixos-hermes/
 ├── .agents/                             # committed local agent skills (GitButler workflow)
 ├── .secrets/                            # GITIGNORED — plaintext secrets, local only
 │   └── hermes-secrets.yaml              # never commit; encrypt before use
-├── hosts/
-│   └── hermes/
-│       ├── disk-config.nix              # disko layout (imported; generates fileSystems.*)
-│       ├── hardware.nix                 # boot, initrd, kernel, GPU, ZFS services (filesystems via disko)
-│       ├── provision.nix                # host-specific activation scripts (one-shot provisioning + recurring refresh)
-│       ├── sops.nix                     # sops-nix secret bindings (host-specific)
-│       ├── virtualisation.nix           # Docker/libvirt host substrate and host-specific group memberships
-│       └── secrets/                     # committed SOPS-encrypted files
-├── modules/
-│   ├── system.nix                       # marker: base system settings rendered from Den
-│   ├── home-manager.nix                 # HM integration flags; user configs rendered from Den
-│   ├── hermes-agent.nix                 # hermes service declaration
-│   ├── hermes-plugins.nix               # declarative Hermes plugin packages/enables
-│   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds, Repowise)
-│   └── users.nix                        # immutable-users flag; users/SSH rendered from Den
+└── den/hosts/nixos-hermes/              # Den-owned host modules and encrypted payloads
+    ├── hardware/default.nix             # boot, initrd, kernel, GPU, ZFS services
+    ├── storage/disk-config.nix          # disko layout (imported; generates fileSystems.*)
+    ├── secrets/sops.nix                 # sops-nix secret bindings
+    ├── secrets/payload/                 # committed SOPS-encrypted files
+    ├── platform/                        # activation/provisioning and virtualisation substrate
+    ├── services/                        # host runtime services
+    └── shared/                          # host-selected shared NixOS modules
 ```
 
 ---
@@ -340,7 +333,7 @@ platform, service, and shared modules.
 > Do not declare `fileSystems.*` manually in `hardware.nix` — that would duplicate what `disko` produces.
 
 At install time:
-  - The same file is also consumed by `nix run .#disko -- --mode disko den/hosts/nixos-hermes/storage/disk-config.nix`.
+  - The same Den-declared path is also consumed by `nix run .#disko-hermes`.
   - Exposed as a flake app so the CLI uses the same `flake.lock` pin as the NixOS module, eliminating module/CLI version skew.
 
 After first install:
