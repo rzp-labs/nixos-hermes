@@ -101,6 +101,42 @@ in
           type = lib.types.str;
           description = "Repository-relative Disko configuration path for install-time tooling.";
         };
+
+        platform.virtualisation.docker.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether the host enables the Docker workload substrate.";
+        };
+
+        platform.virtualisation.docker.storageDriver = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Docker storage driver selected for this host.";
+        };
+
+        platform.virtualisation.docker.autoPruneDates = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Docker auto-prune schedule for this host.";
+        };
+
+        platform.virtualisation.libvirt.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether the host enables the libvirt/QEMU substrate.";
+        };
+
+        platform.virtualisation.rootEquivalentGroups = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Root-equivalent groups granted to trusted host users for virtualisation substrate access.";
+        };
+
+        platform.virtualisation.packages = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Host package names required by the virtualisation substrate.";
+        };
       };
     }
   ];

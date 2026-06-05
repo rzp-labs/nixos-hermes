@@ -105,7 +105,8 @@ selected by the Den host graph in `den/entities.nix`. There is no longer a
 - host activation/provisioning scripts:
   - `den/hosts/nixos-hermes/platform/provision.nix`
 - Docker/libvirt substrate:
-  - `den/hosts/nixos-hermes/platform/virtualisation.nix`
+  - facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.virtualisation`
+  - rendered by `den.aspects.nixos-hermes.os`
 - runtime service modules:
   - `den/hosts/nixos-hermes/services/llama-server.nix`
   - `den/hosts/nixos-hermes/services/hindsight-embed.nix`

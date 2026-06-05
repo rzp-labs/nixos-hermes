@@ -347,12 +347,13 @@ After first install:
 - Lives alongside `secrets/` so that `./secrets/...` paths resolve correctly.
 - The `sops age` key path (`/etc/secrets/age.key`) must not change without updating this file.
 
-### `den/hosts/nixos-hermes/platform/virtualisation.nix`
+### Den platform virtualisation facts
 
-*Host-local Docker/libvirt substrate.*
+*Host-local Docker/libvirt substrate rendered from Den.*
 
-- Owns Docker, libvirt/QEMU, virtiofsd registration, and host-specific operator group memberships needed to use those services.
-- Keep Docker/libvirt group memberships here, not in `den/hosts/nixos-hermes/shared/users.nix`, because those groups only exist on hosts that enable the corresponding services.
+- Facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.virtualisation`.
+- `den.aspects.nixos-hermes.os` renders Docker, libvirt/QEMU, virtiofsd registration, packages, and host-specific operator group memberships needed to use those services.
+- Keep Docker/libvirt group membership facts in the platform virtualisation surface, not in generic user facts, because those groups only exist on hosts that enable the corresponding services.
 - Docker group access is root-equivalent on this host. Adding `hermes` to `docker` is a deliberate operational trust decision for container-first workload proving, not a sandbox boundary.
 - The Docker ZFS storage driver is for the bare-metal ZFS host only. Guest Docker inside VMs/microVMs should use overlay2 on ext4/xfs to avoid stacked CoW over host ZFS.
 

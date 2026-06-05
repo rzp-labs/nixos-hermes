@@ -21,7 +21,6 @@ in
       ];
       platformModules = [
         "den/hosts/nixos-hermes/platform/provision.nix"
-        "den/hosts/nixos-hermes/platform/virtualisation.nix"
       ];
       serviceModules = [
         "den/hosts/nixos-hermes/services/llama-server.nix"
@@ -87,6 +86,23 @@ in
       ];
       storage.zfs = true;
       storage.diskoConfigPath = "den/hosts/nixos-hermes/storage/disk-config.nix";
+      platform.virtualisation = {
+        docker = {
+          enable = true;
+          storageDriver = "zfs";
+          autoPruneDates = "weekly";
+        };
+        libvirt.enable = true;
+        rootEquivalentGroups = [
+          "docker"
+          "libvirtd"
+        ];
+        packages = [
+          "docker-compose"
+          "lazydocker"
+          "virtiofsd"
+        ];
+      };
 
       users.root = {
         sshAuthorizedKeys = [
@@ -165,6 +181,7 @@ in
     let
       packageByName =
         name: lib.attrByPath (lib.splitString "." name) (throw "Unknown Den system package ${name}") pkgs;
+      platformVirtualisationPackages = builtins.map packageByName host.platform.virtualisation.packages;
     in
     {
       networking.hostName = host.name;
@@ -194,7 +211,8 @@ in
 
       services.dbus.implementation = "dbus";
       security.sudo.wheelNeedsPassword = false;
-      environment.systemPackages = builtins.map packageByName host.systemPackages;
+      environment.systemPackages =
+        (builtins.map packageByName host.systemPackages) ++ platformVirtualisationPackages;
       environment.sessionVariables.LIBVA_DRIVER_NAME = "iHD";
 
       users.users.root.openssh.authorizedKeys.keys = root.sshAuthorizedKeys;
@@ -205,12 +223,13 @@ in
           home
           createHome
           homeMode
-          extraGroups
           ;
+        extraGroups = admin.extraGroups ++ host.platform.virtualisation.rootEquivalentGroups;
         openssh.authorizedKeys.keys = admin.sshAuthorizedKeys;
       };
       users.users.hermes = {
         inherit (hermes) description;
+        extraGroups = host.platform.virtualisation.rootEquivalentGroups;
         openssh.authorizedKeys.keys = hermes.sshAuthorizedKeys;
       };
       users.users.den-poc = {
@@ -246,6 +265,22 @@ in
       home-manager.users.den-poc = {
         home.stateVersion = "25.05";
         home.packages = [ pkgs.glow ];
+      };
+
+      virtualisation.docker = {
+        enable = host.platform.virtualisation.docker.enable;
+        storageDriver = lib.mkIf (
+          host.platform.virtualisation.docker.storageDriver != null
+        ) host.platform.virtualisation.docker.storageDriver;
+        autoPrune = lib.mkIf (host.platform.virtualisation.docker.autoPruneDates != null) {
+          enable = true;
+          dates = host.platform.virtualisation.docker.autoPruneDates;
+        };
+      };
+
+      virtualisation.libvirtd = {
+        enable = host.platform.virtualisation.libvirt.enable;
+        qemu.vhostUserPackages = lib.mkIf host.platform.virtualisation.libvirt.enable [ pkgs.virtiofsd ];
       };
     };
 }

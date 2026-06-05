@@ -31,7 +31,6 @@ let
     "den/hosts/nixos-hermes/storage/disk-config.nix"
     "den/hosts/nixos-hermes/secrets/sops.nix"
     "den/hosts/nixos-hermes/platform/provision.nix"
-    "den/hosts/nixos-hermes/platform/virtualisation.nix"
     "den/hosts/nixos-hermes/services/llama-server.nix"
     "den/hosts/nixos-hermes/services/hindsight-embed.nix"
     "den/hosts/nixos-hermes/services/hindsight-memory.nix"
@@ -56,7 +55,6 @@ let
   ];
   expectedPlatformModules = [
     "den/hosts/nixos-hermes/platform/provision.nix"
-    "den/hosts/nixos-hermes/platform/virtualisation.nix"
   ];
   expectedServiceModules = [
     "den/hosts/nixos-hermes/services/llama-server.nix"
@@ -103,6 +101,12 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${builtins.concatStringsSep "," host.systemPackages}' = 'curl,wget,git,man,htop,iotop,tree,jq,python3,ripgrep,unzip,gh,bun,fh,repowise,repowise-nix,llm-agents.cli-proxy-api,llm-agents.but,uv'
   test '${boolString host.storage.zfs}' = 'true'
   test '${host.storage.diskoConfigPath}' = 'den/hosts/nixos-hermes/storage/disk-config.nix'
+  test '${boolString host.platform.virtualisation.docker.enable}' = 'true'
+  test '${host.platform.virtualisation.docker.storageDriver}' = 'zfs'
+  test '${host.platform.virtualisation.docker.autoPruneDates}' = 'weekly'
+  test '${boolString host.platform.virtualisation.libvirt.enable}' = 'true'
+  test '${builtins.concatStringsSep "," host.platform.virtualisation.rootEquivalentGroups}' = 'docker,libvirtd'
+  test '${builtins.concatStringsSep "," host.platform.virtualisation.packages}' = 'docker-compose,lazydocker,virtiofsd'
   test '${admin.name}' = 'admin'
   test '${boolString admin.normalUser}' = 'true'
   test '${boolString admin.hasHomeManagerConfig}' = 'true'
