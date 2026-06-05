@@ -122,7 +122,7 @@ let
       ];
 
       # Den renders the real host's SOPS surface. This VM smoke proves VM-safe
-      # Den-rendered host/user behavior, not real secret decryption, so keep
+      # Den-rendered host/user behavior with dummy runtime secrets only, so keep
       # sops-nix available while preventing real host secret activation.
       sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
       sops.age.sshKeyPaths = lib.mkForce [ ];
@@ -138,9 +138,9 @@ let
         "f /run/secrets/hermes-env 0600 hermes hermes - GITHUB_TOKEN=dummy-token"
       ];
 
-      # The general Den host VM smoke does not decrypt or seed real Hermes
-      # runtime state. Provisioning scripts are covered by activation-focused
-      # VM tests with test secrets.
+      # The general Den host VM smoke seeds dummy service files, but does not
+      # decrypt real secrets or prove real Hermes runtime health. Provisioning
+      # scripts are covered by activation-focused VM tests with test secrets.
       system.activationScripts.hermes-soul-md = lib.mkForce "";
       system.activationScripts.hermes-github-auth = lib.mkForce "";
 
@@ -157,12 +157,17 @@ let
       security.sudo.wheelNeedsPassword = false;
       den.fixtures.denPoc.enable = true;
 
-      # Override docker storage driver and netdata run directory for VM compatibility
+      # Override docker storage driver and netdata run directory for VM compatibility.
       virtualisation.docker.storageDriver = lib.mkForce "overlay2";
       services.netdata.config.global."run directory" = "/run/netdata";
       systemd.services.netdata.serviceConfig.ExecStartPost = lib.mkForce [
         (pkgs.writeShellScript "wait-for-netdata-up-vm" ''
+          deadline=$((SECONDS + 30))
           until [ -S /run/netdata/ipc ] || [ -S /tmp/netdata/ipc ]; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "timed out waiting for netdata IPC socket" >&2
+              exit 1
+            fi
             sleep 0.5
           done
         '')
