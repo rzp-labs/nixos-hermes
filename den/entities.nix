@@ -17,7 +17,6 @@ in
       secretModules = [ ];
       platformModules = [ ];
       serviceModules = [
-        "den/hosts/nixos-hermes/services/llama-server.nix"
         "den/hosts/nixos-hermes/services/hindsight-embed.nix"
         "den/hosts/nixos-hermes/services/agentmemory.nix"
         "den/hosts/nixos-hermes/services/netdata.nix"
@@ -181,6 +180,17 @@ in
       services.hindsightMemory = {
         enable = false;
         activationAfter = [ "hermes-agent-setup" ];
+        llama = {
+          enable = false;
+          modelPath = "/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf";
+          host = "127.0.0.1";
+          port = 8080;
+          contextSize = 8192;
+          threads = 10;
+          enableEmbeddings = true;
+          pooling = "mean";
+          chatTemplate = null;
+        };
         providerConfig = {
           mode = "local_external";
           api_url = "http://127.0.0.1:8888";
@@ -394,11 +404,91 @@ in
         builtins.toJSON hindsightProviderConfig
       );
       hermesHome = "${config.services.hermes-agent.stateDir}/.hermes";
+      hindsightLlama = config.services.hindsightMemory.llama;
+      hindsightLlamaModelName = builtins.baseNameOf hindsightLlama.modelPath;
+      hindsightLlamaArgs = [
+        "--model"
+        hindsightLlama.modelPath
+        "--host"
+        hindsightLlama.host
+        "--port"
+        (toString hindsightLlama.port)
+        "--ctx-size"
+        (toString hindsightLlama.contextSize)
+        "--threads"
+        (toString hindsightLlama.threads)
+      ]
+      ++ lib.optionals hindsightLlama.enableEmbeddings (
+        [ "--embeddings" ]
+        ++ lib.optionals (hindsightLlama.pooling != null) [
+          "--pooling"
+          hindsightLlama.pooling
+        ]
+      )
+      ++ lib.optionals (hindsightLlama.chatTemplate != null) [
+        "--chat-template"
+        hindsightLlama.chatTemplate
+      ];
     in
     {
-      imports = lib.optionals host.hardware.importNotDetected [
-        (modulesPath + "/installer/scan/not-detected.nix")
-      ];
+      imports =
+        lib.optionals host.hardware.importNotDetected [
+          (modulesPath + "/installer/scan/not-detected.nix")
+        ]
+        ++ [
+          {
+            options.services.hindsightMemory.llama = {
+              enable = lib.mkEnableOption "local llama.cpp inference server for Hindsight memory";
+              modelPath = lib.mkOption {
+                type = lib.types.str;
+                default = host.services.hindsightMemory.llama.modelPath;
+                description = "Absolute path to the GGUF model served by llama.cpp.";
+              };
+              host = lib.mkOption {
+                type = lib.types.str;
+                default = host.services.hindsightMemory.llama.host;
+                description = "Address for llama.cpp's OpenAI-compatible HTTP server.";
+              };
+              port = lib.mkOption {
+                type = lib.types.port;
+                default = host.services.hindsightMemory.llama.port;
+                description = "TCP port for llama.cpp's OpenAI-compatible HTTP server.";
+              };
+              contextSize = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = host.services.hindsightMemory.llama.contextSize;
+                description = "Context size passed to llama.cpp.";
+              };
+              threads = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = host.services.hindsightMemory.llama.threads;
+                description = "CPU threads passed to llama.cpp.";
+              };
+              enableEmbeddings = lib.mkOption {
+                type = lib.types.bool;
+                default = host.services.hindsightMemory.llama.enableEmbeddings;
+                description = "Whether to enable llama.cpp's OpenAI-compatible /v1/embeddings endpoint.";
+              };
+              pooling = lib.mkOption {
+                type = lib.types.nullOr (
+                  lib.types.enum [
+                    "mean"
+                    "cls"
+                    "last"
+                    "rank"
+                  ]
+                );
+                default = host.services.hindsightMemory.llama.pooling;
+                description = "Pooling mode used by llama.cpp when embeddings are enabled.";
+              };
+              chatTemplate = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = host.services.hindsightMemory.llama.chatTemplate;
+                description = "Chat template passed to llama.cpp; set to null to let llama.cpp infer it.";
+              };
+            };
+          }
+        ];
 
       # Allow specific unfree packages needed by the system.
       nixpkgs.config.allowUnfreePredicate =
@@ -689,7 +779,11 @@ in
       nix.settings.trusted-users = host.trustedUsers;
       system.stateVersion = host.stateVersion;
       users.mutableUsers = host.userManagement.mutableUsers;
-      systemd.tmpfiles.rules = host.userManagement.tmpfilesRules;
+      systemd.tmpfiles.rules =
+        host.userManagement.tmpfilesRules
+        ++ lib.optionals hindsightLlama.enable [
+          "d /var/lib/hermes/models 0755 hermes hermes - -"
+        ];
       home-manager.useGlobalPkgs = host.homeManager.useGlobalPkgs;
       home-manager.useUserPackages = host.homeManager.useUserPackages;
 
@@ -840,6 +934,28 @@ in
           fi
         ''
       );
+
+      systemd.services.llama-server = lib.mkIf hindsightLlama.enable {
+        description = "llama.cpp inference server (${hindsightLlamaModelName})";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network.target" ];
+
+        serviceConfig = {
+          Type = "simple";
+          User = "hermes";
+          StateDirectory = "hermes";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          ExecStartPre = pkgs.writeShellScript "llama-server-precheck" ''
+            if [ ! -f ${lib.escapeShellArg hindsightLlama.modelPath} ]; then
+              echo "ERROR: model file not found at ${hindsightLlama.modelPath}"
+              echo "Place the Gemma GGUF at services.hindsightMemory.llama.modelPath or override that option."
+              exit 1
+            fi
+          '';
+          ExecStart = lib.escapeShellArgs ([ "${pkgs.llama-cpp}/bin/llama-server" ] ++ hindsightLlamaArgs);
+        };
+      };
 
       # Keep the retired Hindsight provider disabled by default but render its
       # cleanup/config activation behavior from Den so stale interactive setup

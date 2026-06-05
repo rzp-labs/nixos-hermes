@@ -400,6 +400,67 @@ in
           description = "Activation script dependencies for Hindsight provider config refresh.";
         };
 
+        services.hindsightMemory.llama = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Whether the local llama.cpp inference server for Hindsight memory is enabled.";
+              };
+              modelPath = lib.mkOption {
+                type = lib.types.str;
+                default = "/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf";
+                description = "Absolute path to the GGUF model served by llama.cpp.";
+              };
+              host = lib.mkOption {
+                type = lib.types.str;
+                default = "127.0.0.1";
+                description = "Address for llama.cpp's OpenAI-compatible HTTP server.";
+              };
+              port = lib.mkOption {
+                type = lib.types.port;
+                default = 8080;
+                description = "TCP port for llama.cpp's OpenAI-compatible HTTP server.";
+              };
+              contextSize = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 8192;
+                description = "Context size passed to llama.cpp.";
+              };
+              threads = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 10;
+                description = "CPU threads passed to llama.cpp.";
+              };
+              enableEmbeddings = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Whether to enable llama.cpp's OpenAI-compatible /v1/embeddings endpoint.";
+              };
+              pooling = lib.mkOption {
+                type = lib.types.nullOr (
+                  lib.types.enum [
+                    "mean"
+                    "cls"
+                    "last"
+                    "rank"
+                  ]
+                );
+                default = "mean";
+                description = "Pooling mode used by llama.cpp when embeddings are enabled.";
+              };
+              chatTemplate = lib.mkOption {
+                type = lib.types.nullOr lib.types.str;
+                default = null;
+                description = "Chat template passed to llama.cpp; set to null to let llama.cpp infer it.";
+              };
+            };
+          };
+          default = { };
+          description = "Local llama.cpp inference server facts for the retired Hindsight memory substrate.";
+        };
+
         secrets.defaultSopsFile = lib.mkOption {
           type = lib.types.str;
           description = "Repository-relative default SOPS file for this host.";
