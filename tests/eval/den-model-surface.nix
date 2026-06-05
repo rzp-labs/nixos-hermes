@@ -30,7 +30,6 @@ let
     "den/hosts/nixos-hermes/storage/disk-config.nix"
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
-    "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
@@ -43,7 +42,6 @@ let
   expectedServiceModules = [
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
-    "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
@@ -128,6 +126,14 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.services.hindsightMemory.llm.baseUrl}' = 'http://10.0.0.102:8317/v1'
   test '${host.services.hindsightMemory.llm.model}' = 'gpt-5.4-mini'
   test '${toString host.services.hindsightMemory.llm.timeout}' = '120'
+  test '${toString host.services.ompAuthGateway.brokerPort}' = '9000'
+  test '${toString host.services.ompAuthGateway.gatewayPort}' = '4000'
+  test '${host.services.ompAuthGateway.bindHost}' = '127.0.0.1'
+  test '${host.services.ompAuthGateway.adminHome}' = '/home/admin'
+  test '${host.services.ompAuthGateway.primaryModel}' = 'gpt-5.5'
+  test '${host.services.ompAuthGateway.fallbackModel}' = 'gemini-3-flash-agent'
+  test '${host.services.ompAuthGateway.delegationModel}' = 'gemini-3-flash-agent'
+  test '${host.services.ompAuthGateway.localApiKey}' = 'local-auth-gateway'
   test '${boolString host.services.hindsightMemory.llama.enable}' = 'false'
   test '${host.services.hindsightMemory.llama.modelPath}' = '/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf'
   test '${host.services.hindsightMemory.llama.host}' = '127.0.0.1'

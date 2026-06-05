@@ -429,6 +429,55 @@ in
           description = "Hindsight retain/reflect LLM route facts for the retired memory substrate.";
         };
 
+        services.ompAuthGateway = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              brokerPort = lib.mkOption {
+                type = lib.types.port;
+                default = 9000;
+                description = "Loopback port for the OMP OAuth broker.";
+              };
+              gatewayPort = lib.mkOption {
+                type = lib.types.port;
+                default = 4000;
+                description = "Loopback port for the OMP OpenAI-compatible auth gateway.";
+              };
+              bindHost = lib.mkOption {
+                type = lib.types.str;
+                default = "127.0.0.1";
+                description = "Loopback bind address for the OMP broker and gateway.";
+              };
+              adminHome = lib.mkOption {
+                type = lib.types.str;
+                default = "/home/admin";
+                description = "Home directory that owns the OMP OAuth/auth state.";
+              };
+              primaryModel = lib.mkOption {
+                type = lib.types.str;
+                default = "gpt-5.5";
+                description = "Primary Hermes model routed through the OMP auth gateway.";
+              };
+              fallbackModel = lib.mkOption {
+                type = lib.types.str;
+                default = "gemini-3-flash-agent";
+                description = "Fallback Hermes model routed through a distinct upstream lane.";
+              };
+              delegationModel = lib.mkOption {
+                type = lib.types.str;
+                default = "gemini-3-flash-agent";
+                description = "Delegated worker model routed through the OMP auth gateway.";
+              };
+              localApiKey = lib.mkOption {
+                type = lib.types.str;
+                default = "local-auth-gateway";
+                description = "Non-secret local API key marker for loopback OpenAI-compatible clients.";
+              };
+            };
+          };
+          default = { };
+          description = "OMP OAuth broker/auth-gateway facts for Hermes inference routing.";
+        };
+
         services.hindsightMemory.llama = lib.mkOption {
           type = lib.types.submodule {
             options = {
