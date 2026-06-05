@@ -828,6 +828,12 @@ in
           description = "Mirrors users.users.<name>.openssh.authorizedKeys.keys.";
         };
 
+        homePackages = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Home Manager package attribute names rendered for this user.";
+        };
+
       };
     }
   ];
