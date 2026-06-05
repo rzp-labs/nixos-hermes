@@ -2367,9 +2367,11 @@ in
           ompAuthGatewayModule
         ];
 
-      # Allow specific unfree packages needed by the system.
-      nixpkgs.config.allowUnfreePredicate =
-        pkg: builtins.elem (lib.getName pkg) host.nixpkgs.allowedUnfree;
+      # Allow specific unfree packages needed by the host while letting NixOS VM
+      # tests keep nixpkgs' read-only defaults.
+      nixpkgs.config.allowUnfreePredicate = lib.mkDefault (
+        pkg: builtins.elem (lib.getName pkg) host.nixpkgs.allowedUnfree
+      );
 
       nixpkgs.overlays = [
         # llm-agents.nix provides claude-code, codex, omp, agent-browser, and many more.
