@@ -37,12 +37,8 @@ nixos-hermes/
 ├── .agents/                             # committed local agent skills (GitButler workflow)
 ├── .secrets/                            # GITIGNORED — plaintext secrets, local only
 │   └── hermes-secrets.yaml              # never commit; encrypt before use
-└── den/hosts/nixos-hermes/              # Den-owned host modules and encrypted payloads
-    ├── storage/disk-config.nix          # disko layout (imported; generates fileSystems.*)
-    ├── secrets/payload/                 # committed SOPS-encrypted files
-    ├── platform/                        # host platform leaves still awaiting Den rendering
-    ├── services/                        # host runtime services
-    └── shared/                          # host-selected shared NixOS modules
+└── den/hosts/nixos-hermes/
+    └── secrets/payload/                 # committed SOPS-encrypted files
 ```
 
 ---
@@ -221,7 +217,7 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
     - Currently supplies `bun` and `llama-cpp` with Gemma 4 support until
       FlakeHub `NixOS/nixpkgs/0` catches up.
     - Netdata currently uses this package set as a base plus a scoped package
-      override in `den/hosts/nixos-hermes/services/netdata.nix` because both pinned nixpkgs inputs
+      override rendered from `den/entities.nix` because both pinned nixpkgs inputs
       lag Netdata Cloud's required stable agent release.
   - `nousresearch/hermes-agent`
     - Not published to FlakeHub at this time.
@@ -260,26 +256,10 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 - `nixosConfigurations.nixos-hermes` remains the deployment output, but it now
   imports `self.denModel.den.hosts.x86_64-linux.nixos-hermes.mainModule`.
   Den-rendered NixOS/Home Manager output owns migrated baseline config.
-- `schema.nix` owns repo-local host/user vocabulary mirrored from current code,
-  such as imported module paths, service-module lists, `stateVersion`,
-  `nixpkgsHostPlatform`, host identity, baseline system packages, user homes,
-  groups, Home Manager presence, and SSH keys. Do not add aspirational/persona
-  fields here unless an existing source file already encodes that fact.
-- `entities.nix` owns current repo-safe inventory facts for `nixos-hermes`,
-  `root`, `admin`, `hermes`, and VM fixture user `den-poc`. It also owns the
-  Den aspects that render the migrated system baseline, user declarations, SSH
-  keys, and `admin`/`hermes` Home Manager config. Keep entities inventory-like;
-  extract reusable behavior into `lab.*` as it grows.
-- `lab.nix` owns the local `lab` namespace/category skeleton. Reusable behavior
-  should later land under `lab.platform`, `lab.features`, `lab.workloads`,
-  `lab.hardware`, `lab.users`, or `lab.quirks`; concrete host/user aspects should
-  stay thin composition points.
-- Do not add custom fleet/environment topology, quirks that drive production
-  config, or host-service migrations here without a follow-up issue and eval/VM
-  proof. Current Den-rendered production scope is users, SSH keys, Home Manager,
-  host/system baseline, hardware, SOPS/secrets, virtualization, provisioning, user-management, Home Manager integration, users/Home Manager, and install-time
-  Disko path facts. Disko/ZFS layout and package overlay
-  definitions, and service runtime modules remain native host imports.
+- `schema.nix` owns repo-local host/user/home/hardware/storage/secret/platform/service/package vocabulary mirrored from current code. Do not add aspirational/persona fields here unless an existing source file already encodes that fact.
+- `entities.nix` owns current repo-safe inventory facts for `nixos-hermes`, `root`, `admin`, `hermes`, and VM fixture user `den-poc`. It also owns the Den aspects that render the host/system baseline, hardware, Disko storage facts, SOPS bindings, virtualisation, provisioning, package overlays/workarounds, runtime services, user declarations, SSH keys, and `admin`/`hermes` Home Manager config. Keep entities inventory-like; extract reusable behavior into `lab.*` as it grows.
+- `lab.nix` owns the local `lab` namespace/category skeleton. Reusable behavior should later land under `lab.platform`, `lab.features`, `lab.workloads`, `lab.hardware`, `lab.users`, or `lab.quirks`; concrete host/user aspects should stay thin composition points.
+- Do not add custom fleet/environment topology or quirks that drive production config without a follow-up issue and eval/VM proof. The former native host leaves under `hosts/`, `modules/`, and `den/hosts/nixos-hermes/{hardware,platform,services,shared,storage}` have been removed; `den/hosts/nixos-hermes/` now contains only encrypted secret payloads.
 
 ### `checks/pre-commit.nix`
 
@@ -302,43 +282,27 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
   `let`. Do not define them in the file-level `let` and rely on Nix laziness to
   avoid Darwin evaluation.
 
-### Host module graph
+### Den-rendered host ownership
 
-The host no longer has a `hosts/hermes/default.nix` entrypoint. `flake.nix`
-maps `den.hosts.x86_64-linux.nixos-hermes.moduleImports` into the NixOS module
-list. The Den host entity categorizes that graph as hardware, storage, secrets,
-platform, service, and shared modules.
+The host no longer has a `hosts/hermes/default.nix` entrypoint, and the former native leaves under `den/hosts/nixos-hermes/{hardware,platform,services,shared,storage}` have been removed. `flake.nix` imports `den.hosts.x86_64-linux.nixos-hermes.mainModule`; the only files left under `den/hosts/nixos-hermes/` are encrypted secret payloads.
 
 - Do not re-add a host entrypoint import list under `hosts/hermes/default.nix`.
-- Add new host module files to the appropriate Den host graph category in
-  `den/entities.nix`, then extend eval/VM proof where the module has
-  VM-safe behavior.
+- Do not re-add service/storage/shared marker modules under `den/hosts/nixos-hermes/` for ordinary host config.
+- Add new host-owned facts to `den/schema.nix` / `den/entities.nix`, then extend eval/VM proof where the rendered behavior has a VM-safe surface.
 
-### Den hardware facts
+### Den hardware and storage facts
 
-*Bare-metal hardware configuration rendered from Den.*
+*Bare-metal hardware and Disko storage rendered from Den.*
 
-- Facts live under `den.hosts.x86_64-linux.nixos-hermes.hardware`.
+- Hardware facts live under `den.hosts.x86_64-linux.nixos-hermes.hardware`.
+- Storage facts live under `den.hosts.x86_64-linux.nixos-hermes.storage`.
 - `den.aspects.nixos-hermes.os` renders boot, initrd, kernel, GPU, bootloader, fallback ESP sync, and ZFS maintenance settings.
-- Storage layout remains in `den/hosts/nixos-hermes/storage/disk-config.nix`; hardware facts do not repartition disks.
-- Filesystem mounts themselves are generated by `disko` from `disk-config.nix`, not declared here.
+- `flake.nix` renders `disko.devices` from Den storage facts for the real host output where the Disko module exists.
+- `apps/default.nix` renders `.#disko-hermes` from the same Den storage facts for first install/reimage flows.
 
-### `den/hosts/nixos-hermes/storage/disk-config.nix`
+> Do not declare `fileSystems.*` manually in hardware config — Disko generates them from the modeled device/pool/dataset mountpoints.
 
-*Declarative disk layout consumed by `disko`.*
-
-- Describes GPT partitions and the ZFS pool/dataset structure.
-- Imported as a NixOS module via `disko.nixosModules.default`, so `disko` generates `fileSystems.*` entries at evaluation time from the `mountpoint = "..."` attributes on each partition and dataset.
-
-> Do not declare `fileSystems.*` manually in `hardware.nix` — that would duplicate what `disko` produces.
-
-At install time:
-  - The same Den-declared path is also consumed by `nix run .#disko-hermes`.
-  - Exposed as a flake app so the CLI uses the same `flake.lock` pin as the NixOS module, eliminating module/CLI version skew.
-
-After first install:
-  - The partition/pool sections are effectively reference documentation.
-  - Changing them does not reformat disks, but the `mountpoint` attributes remain live: they control mounting on every rebuild.
+After first install, partition/pool sections are effectively reference documentation. Changing them does not reformat disks, but dataset `mountpoint` attributes remain live because they control mounting on every rebuild.
 
 ### Den secret facts
 
@@ -347,76 +311,42 @@ After first install:
 - Facts live under `den.hosts.x86_64-linux.nixos-hermes.secrets`.
 - `den.aspects.nixos-hermes.os` renders `sops.defaultSopsFile`, age identity settings, and `sops.secrets`.
 - Committed encrypted payloads live under `den/hosts/nixos-hermes/secrets/payload/`.
-
 - The `sops age` key path (`/etc/secrets/age.key`) is modeled by Den and must not change without updating the host secret facts.
 
-### Den platform virtualisation facts
+### Den platform facts
 
-*Host-local Docker/libvirt substrate rendered from Den.*
+*Host-local Docker/libvirt substrate and activation provisioning rendered from Den.*
 
-- Facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.virtualisation`.
-- `den.aspects.nixos-hermes.os` renders Docker, libvirt/QEMU, virtiofsd registration, packages, and host-specific operator group memberships needed to use those services.
+- Virtualisation facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.virtualisation`.
+- Provisioning facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.provisioning`.
+- `den.aspects.nixos-hermes.os` renders Docker, libvirt/QEMU, virtiofsd registration, packages, host-specific operator group memberships, one-shot SOUL.md seeding, and recurring GitHub credential refresh.
 - Keep Docker/libvirt group membership facts in the platform virtualisation surface, not in generic user facts, because those groups only exist on hosts that enable the corresponding services.
 - Docker group access is root-equivalent on this host. Adding `hermes` to `docker` is a deliberate operational trust decision for container-first workload proving, not a sandbox boundary.
 - The Docker ZFS storage driver is for the bare-metal ZFS host only. Guest Docker inside VMs/microVMs should use overlay2 on ext4/xfs to avoid stacked CoW over host ZFS.
+- One-shot provisioning scripts with file-existence guards run once on first boot to seed runtime state. To re-provision: delete the target file on the host, then rebuild.
 
-### Den provisioning facts
+### Den package and service facts
 
-*Host-specific activation scripts rendered from Den.*
+*Overlays, package workarounds, Hermes runtime, monitoring, memory, and gateway services rendered from Den.*
 
-- Facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.provisioning`.
-- `den.aspects.nixos-hermes.os` renders one-shot SOUL.md seeding and recurring GitHub credential refresh.
-- **One-shot provisioning:** activation scripts with a file-existence guard run once on first boot to seed runtime state. Rebuilds do not clobber runtime-evolved state. To re-provision: delete the target file on the host, then rebuild.
-- **Recurring refresh:** activation scripts with no guard run on every activation. Used for credentials and other state that must stay in sync with sops secrets.
-- These facts are host-specific and not portable across hosts.
-- To re-provision a file: delete it on the host, then rebuild.
-
-### `den/hosts/nixos-hermes/shared/packages.nix`
-
-*nixpkgs overlays and NixOS packaging workarounds.*
-
-- Owns the nixpkgs overlay that injects packages not yet in the pinned channel.
-  Community overlays (e.g. `llm-agents`) are added here until they land upstream.
-- Also owns workarounds for NixOS packaging behaviour that affect services on this
-  host (e.g. the `opusCtypesShim` for CPython's patched `ctypes.util.find_library`).
-  Keep that shim scoped to Opus discovery; Hindsight's agent-facing Python client
-  belongs in `services.hermes-agent.extraPythonPackages`, not in this `sitecustomize.py`.
-- Exposes shims via the overlay (e.g. `pkgs.opusCtypesShim`) so service modules
-  can consume them without coupling to this file directly.
-- Owns the standalone Repowise Nix flake (`packages/repowise-nix`) and `repowise-nix` wrapper. See
-  `docs/guides/REPOWISE.md` for runtime usage and credential boundaries.
+- Package overlay/workaround facts live under `den.hosts.x86_64-linux.nixos-hermes.packages` and related service facts.
+- Runtime service facts live under `den.hosts.x86_64-linux.nixos-hermes.services`.
+- `den.aspects.nixos-hermes.os` renders Hermes Agent settings, Hermes plugins, Netdata monitoring, Agent Memory, OMP auth gateway, and disabled Hindsight memory options.
+- Entry-point Python plugins belong in rendered `services.hermes-agent.extraPythonPackages`.
+- Directory plugins belong in rendered `services.hermes-agent.extraPlugins`.
+- Plugin runtime binaries belong in rendered `services.hermes-agent.extraPackages`.
+- Plugin names must also be enabled in rendered `services.hermes-agent.settings.plugins.enabled`.
+- The `opusCtypesShim` remains scoped to Opus discovery; Hindsight's agent-facing Python client belongs in Hermes `extraPythonPackages`.
+- The standalone Repowise Nix flake (`packages/repowise-nix`) and `repowise-nix` wrapper remain package sources, with host exposure rendered from Den. See `docs/guides/REPOWISE.md` for runtime usage and credential boundaries.
 
 ### Den shared system, Home Manager, and user-management facts
 
 *Shared baseline rendered from Den.*
 
-- The former `shared/system.nix`, `shared/home-manager.nix`, and
-  `shared/users.nix` marker modules have been removed.
-- Locale, timezone, networking, OpenSSH, sudo, Home Manager integration flags,
-  immutable-user policy, admin workspace tmpfiles, users, SSH keys, packages,
-  and session variables are rendered from `den/entities.nix` via the Den host
-  aspect.
-- Keep new user-facing toolchain changes in the Den user/home aspects unless
-  intentionally changing this ownership boundary.
-- Add other service accounts deliberately; review their runtime state boundary
-  before Home Manager owns additional home files.
-
-### `den/hosts/nixos-hermes/services/hermes-agent/default.nix`
-
-*The `hermes-agent` service declaration.*
-
-- All core `services.hermes-agent.*` options belong here.
-- Secrets are referenced by name from the `sops` bindings.
-
-### `den/hosts/nixos-hermes/services/hermes-agent/plugins.nix`
-
-*Declarative Hermes plugin installation and enablement.*
-
-- Entry-point Python plugins belong in `services.hermes-agent.extraPythonPackages`.
-- Directory plugins belong in `services.hermes-agent.extraPlugins`.
-- Plugin runtime binaries belong in `services.hermes-agent.extraPackages`.
-- Plugin names must also be enabled in `services.hermes-agent.settings.plugins.enabled`.
-- See `docs/guides/HERMES_PLUGINS_NIX.md` before adding or updating plugins.
+- The former `shared/system.nix`, `shared/home-manager.nix`, and `shared/users.nix` marker modules have been removed.
+- Locale, timezone, networking, OpenSSH, sudo, Home Manager integration flags, immutable-user policy, admin workspace tmpfiles, users, SSH keys, packages, and session variables are rendered from `den/entities.nix` via the Den host aspect.
+- Keep new user-facing toolchain changes in the Den user/home aspects unless intentionally changing this ownership boundary.
+- Add other service accounts deliberately; review their runtime state boundary before Home Manager owns additional home files.
 
 ## Testing and Validation
 

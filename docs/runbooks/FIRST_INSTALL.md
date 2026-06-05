@@ -6,7 +6,7 @@ Two paths are supported. **Prefer nixos-anywhere** for a headless host: you neve
 
 ### What nixos-anywhere needs
 
-Exactly one thing: SSH access to the target as `root` (or as a user with  passwordless `sudo`), running any reasonably current Linux kernel. From there it kexecs into a NixOS installer, partitions via `disk-config.nix`, installs the flake, and reboots — without you touching the physical machine again.
+Exactly one thing: SSH access to the target as `root` (or as a user with  passwordless `sudo`), running any reasonably current Linux kernel. From there it kexecs into a NixOS installer, partitions via the Den-rendered Disko app, installs the flake, and reboots — without you touching the physical machine again.
 
 The age private key is seeded onto the target during install via `--extra-files`, so sops-nix can decrypt secrets on first activation.
 
@@ -22,7 +22,7 @@ This is the easiest path; nothing to install. Just confirm:
 - Your workstation's public key is in `~/.ssh/authorized_keys` for either `root` or a user with passwordless `sudo`.
 - The machine has outbound internet (nixos-anywhere fetches nixpkgs during install).
 
-nixos-anywhere will kexec over the existing distro and wipe the disks per `disk-config.nix`, so there is nothing on the current install worth preserving.
+nixos-anywhere will kexec over the existing distro and wipe the disks per the Den-modeled Disko storage facts, so there is nothing on the current install worth preserving.
 
 #### State 2 — target is bare-metal with no OS.
 
@@ -102,7 +102,7 @@ cp /path/to/age.key extra-files/etc/secrets/age.key
 chmod 400 extra-files/etc/secrets/age.key
 
 # 2. Kexec the target (if not already NixOS) into the NixOS installer, run
-#    Disko from the Den-declared host storage config path, install, and reboot.
+#    Disko from the Den-declared host storage facts, install, and reboot.
 nix run .#nixos-anywhere -- \
   --flake .#nixos-hermes \
   --extra-files extra-files \
@@ -133,7 +133,7 @@ nix shell nixpkgs#git -c git clone https://github.com/rzp-labs/nixos-hermes /roo
 cd /root/nixos-hermes
 
 # 3. Partition, format, and mount every filesystem under /mnt in one shot.
-# disko reads disk-config.nix, destroys existing layouts on the target disks,
+# disko reads the Den-rendered storage facts, destroys existing layouts on the target disks,
 # creates GPT + ESPs + zpool + datasets, and mounts everything at /mnt
 # according to the mountpoint attributes. `.#disko-hermes` uses the Den host
 # storage fact plus the lockfile-pinned
