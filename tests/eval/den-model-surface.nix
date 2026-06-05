@@ -28,7 +28,6 @@ let
 
   expectedModuleImports = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
-    "den/hosts/nixos-hermes/services/hindsight-embed.nix"
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
@@ -42,7 +41,6 @@ let
   expectedSecretModules = [ ];
   expectedPlatformModules = [ ];
   expectedServiceModules = [
-    "den/hosts/nixos-hermes/services/hindsight-embed.nix"
     "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
@@ -126,6 +124,10 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.services.hindsightMemory.providerConfig.bank_id}' = 'hermes'
   test '${host.services.hindsightMemory.providerConfig.bank_id_template}' = 'hermes-{profile}'
   test '${host.services.hindsightMemory.providerConfig.budget}' = 'mid'
+  test '${host.services.hindsightMemory.llm.provider}' = 'openai'
+  test '${host.services.hindsightMemory.llm.baseUrl}' = 'http://10.0.0.102:8317/v1'
+  test '${host.services.hindsightMemory.llm.model}' = 'gpt-5.4-mini'
+  test '${toString host.services.hindsightMemory.llm.timeout}' = '120'
   test '${boolString host.services.hindsightMemory.llama.enable}' = 'false'
   test '${host.services.hindsightMemory.llama.modelPath}' = '/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf'
   test '${host.services.hindsightMemory.llama.host}' = '127.0.0.1'

@@ -400,6 +400,35 @@ in
           description = "Activation script dependencies for Hindsight provider config refresh.";
         };
 
+        services.hindsightMemory.llm = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              provider = lib.mkOption {
+                type = lib.types.str;
+                default = "openai";
+                description = "Hindsight LLM provider name. Use openai for OpenAI-compatible proxies.";
+              };
+              baseUrl = lib.mkOption {
+                type = lib.types.str;
+                default = "http://10.0.0.102:8317/v1";
+                description = "OpenAI-compatible base URL used for Hindsight retain/reflect LLM calls.";
+              };
+              model = lib.mkOption {
+                type = lib.types.str;
+                default = "gpt-5.4-mini";
+                description = "Model used for Hindsight retain/reflect LLM calls.";
+              };
+              timeout = lib.mkOption {
+                type = lib.types.ints.positive;
+                default = 120;
+                description = "Timeout in seconds for Hindsight LLM calls through the external proxy.";
+              };
+            };
+          };
+          default = { };
+          description = "Hindsight retain/reflect LLM route facts for the retired memory substrate.";
+        };
+
         services.hindsightMemory.llama = lib.mkOption {
           type = lib.types.submodule {
             options = {
