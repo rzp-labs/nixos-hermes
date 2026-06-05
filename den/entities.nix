@@ -27,10 +27,7 @@ in
         "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
       ];
       sharedModules = [
-        "den/hosts/nixos-hermes/shared/system.nix"
         "den/hosts/nixos-hermes/shared/packages.nix"
-        "den/hosts/nixos-hermes/shared/home-manager.nix"
-        "den/hosts/nixos-hermes/shared/users.nix"
       ];
     in
     {
@@ -54,6 +51,14 @@ in
       hostId = "52dd4e5a";
       stateVersion = "25.05";
       trustedUsers = [ "admin" ];
+      userManagement.mutableUsers = false;
+      userManagement.tmpfilesRules = [
+        "d /home/admin/workspace 0755 admin users - -"
+      ];
+      homeManager = {
+        useGlobalPkgs = true;
+        useUserPackages = true;
+      };
       timeZone = "America/Phoenix";
       defaultLocale = "en_US.UTF-8";
       consoleKeyMap = "us";
@@ -326,6 +331,10 @@ in
       networking.hostId = host.hostId;
       nix.settings.trusted-users = host.trustedUsers;
       system.stateVersion = host.stateVersion;
+      users.mutableUsers = host.userManagement.mutableUsers;
+      systemd.tmpfiles.rules = host.userManagement.tmpfilesRules;
+      home-manager.useGlobalPkgs = host.homeManager.useGlobalPkgs;
+      home-manager.useUserPackages = host.homeManager.useUserPackages;
 
       time.timeZone = host.timeZone;
       i18n.defaultLocale = host.defaultLocale;

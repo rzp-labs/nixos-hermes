@@ -36,10 +36,7 @@ let
     "den/hosts/nixos-hermes/services/omp-auth-gateway.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
-    "den/hosts/nixos-hermes/shared/system.nix"
     "den/hosts/nixos-hermes/shared/packages.nix"
-    "den/hosts/nixos-hermes/shared/home-manager.nix"
-    "den/hosts/nixos-hermes/shared/users.nix"
   ];
   expectedHardwareModules = [ ];
   expectedStorageModules = [
@@ -58,10 +55,7 @@ let
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
   ];
   expectedSharedModules = [
-    "den/hosts/nixos-hermes/shared/system.nix"
     "den/hosts/nixos-hermes/shared/packages.nix"
-    "den/hosts/nixos-hermes/shared/home-manager.nix"
-    "den/hosts/nixos-hermes/shared/users.nix"
   ];
   allHostModulesUnderDen = builtins.all (
     path: builtins.substring 0 23 path == "den/hosts/nixos-hermes/"
@@ -89,6 +83,10 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.defaultLocale}' = 'en_US.UTF-8'
   test '${host.consoleKeyMap}' = 'us'
   test '${builtins.concatStringsSep "," host.trustedUsers}' = 'admin'
+  test '${boolString host.userManagement.mutableUsers}' = 'false'
+  test '${builtins.concatStringsSep "," host.userManagement.tmpfilesRules}' = 'd /home/admin/workspace 0755 admin users - -'
+  test '${boolString host.homeManager.useGlobalPkgs}' = 'true'
+  test '${boolString host.homeManager.useUserPackages}' = 'true'
   test '${builtins.concatStringsSep "," host.systemPackages}' = 'curl,wget,git,man,htop,iotop,tree,jq,python3,ripgrep,unzip,gh,bun,fh,repowise,repowise-nix,llm-agents.cli-proxy-api,llm-agents.but,uv'
   test '${boolString host.storage.zfs}' = 'true'
   test '${boolString host.hardware.importNotDetected}' = 'true'

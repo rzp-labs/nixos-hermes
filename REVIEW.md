@@ -139,33 +139,18 @@ Owns the host module graph categories used by `flake.nix`:
 This is the current host instantiation boundary: `flake.nix` maps these Den
 paths into NixOS modules.
 
-### `den/hosts/nixos-hermes/shared/system.nix`
+### Shared system, Home Manager, and user-management facts
 
-Marker module only. Migrated baseline system settings are rendered from Den.
+The former `shared/system.nix`, `shared/home-manager.nix`, and `shared/users.nix`
+marker modules have been removed. Their remaining behavior is modeled as Den
+host facts and rendered by `den.aspects.nixos-hermes.os`:
 
-### `den/hosts/nixos-hermes/shared/home-manager.nix`
+- host/system baseline facts;
+- Home Manager integration flags;
+- `users.mutableUsers = false`;
+- admin workspace tmpfiles rule.
 
-Home Manager NixOS integration flags only:
-
-```nix
-home-manager.useGlobalPkgs = true;
-home-manager.useUserPackages = true;
-```
-
-User Home Manager configs are rendered from Den.
-
-### `den/hosts/nixos-hermes/shared/users.nix`
-
-Immutable-user policy and an admin workspace tmpfiles rule:
-
-```nix
-users.mutableUsers = false;
-systemd.tmpfiles.rules = [
-  "d /home/admin/workspace 0755 admin users - -"
-];
-```
-
-Actual user accounts and SSH keys are rendered from Den.
+Actual user accounts and SSH keys are also rendered from Den.
 
 ### `den/hosts/nixos-hermes/shared/packages.nix`
 

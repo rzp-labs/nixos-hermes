@@ -82,7 +82,7 @@ nixos-hermes/
 
 ### Users
 
-- `users.mutableUsers = false` — the NixOS activation rejects user state not described declaratively. The flag remains in `den/hosts/nixos-hermes/shared/users.nix`, while the actual `root`, `admin`, and `hermes` user/SSH declarations are rendered from `den/entities.nix` through the Den host aspect. Do not add users imperatively on the host.
+- `users.mutableUsers = false` — the NixOS activation rejects user state not described declaratively. The flag, admin workspace tmpfiles rule, and the actual `root`, `admin`, and `hermes` user/SSH declarations are rendered from `den/entities.nix` through the Den host aspect. Do not add users imperatively on the host.
 - Authentication is via SSH key only. Do not add password hashes unless explicitly requested.
   requested.
 - `admin` has `wheel` and should have `security.sudo.wheelNeedsPassword = false` set (or equivalent) since there is no password configured.
@@ -277,8 +277,8 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 - Do not add custom fleet/environment topology, quirks that drive production
   config, or host-service migrations here without a follow-up issue and eval/VM
   proof. Current Den-rendered production scope is users, SSH keys, Home Manager,
-  host/system baseline, hardware, SOPS/secrets, virtualization, and install-time
-  Disko path facts, and provisioning scripts. Disko/ZFS layout, package overlay
+  host/system baseline, hardware, SOPS/secrets, virtualization, provisioning, user-management, Home Manager integration, users/Home Manager, and install-time
+  Disko path facts. Disko/ZFS layout and package overlay
   definitions, and service runtime modules remain native host imports.
 
 ### `checks/pre-commit.nix`
@@ -386,23 +386,16 @@ After first install:
 - Owns the standalone Repowise Nix flake (`packages/repowise-nix`) and `repowise-nix` wrapper. See
   `docs/guides/REPOWISE.md` for runtime usage and credential boundaries.
 
-### `den/hosts/nixos-hermes/shared/system.nix`
+### Den shared system, Home Manager, and user-management facts
 
-*Base system settings.*
+*Shared baseline rendered from Den.*
 
-- Marker module only. Locale, timezone, networking, OpenSSH, sudo, packages,
+- The former `shared/system.nix`, `shared/home-manager.nix`, and
+  `shared/users.nix` marker modules have been removed.
+- Locale, timezone, networking, OpenSSH, sudo, Home Manager integration flags,
+  immutable-user policy, admin workspace tmpfiles, users, SSH keys, packages,
   and session variables are rendered from `den/entities.nix` via the Den host
   aspect.
-- Do not re-add migrated baseline options here unless intentionally reverting
-  Den ownership.
-
-### `den/hosts/nixos-hermes/shared/home-manager.nix`
-
-*User-scoped interactive/operator environment.*
-
-- Owns only Home Manager's NixOS integration flags (`useGlobalPkgs`,
-  `useUserPackages`). The `admin` and `hermes` Home Manager user modules are
-  rendered from Den.
 - Keep new user-facing toolchain changes in the Den user/home aspects unless
   intentionally changing this ownership boundary.
 - Add other service accounts deliberately; review their runtime state boundary
@@ -424,17 +417,6 @@ After first install:
 - Plugin runtime binaries belong in `services.hermes-agent.extraPackages`.
 - Plugin names must also be enabled in `services.hermes-agent.settings.plugins.enabled`.
 - See `docs/guides/HERMES_PLUGINS_NIX.md` before adding or updating plugins.
-
-### `den/hosts/nixos-hermes/shared/users.nix`
-
-*Immutable user definitions.*
-
-- Owns `users.mutableUsers = false` and the admin workspace tmpfiles marker.
-- User accounts and authorized SSH keys for `root`, `admin`, and `hermes` are
-  rendered from Den. Do not re-add them here unless intentionally reverting Den
-  ownership.
-
----
 
 ## Testing and Validation
 

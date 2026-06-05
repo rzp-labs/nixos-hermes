@@ -91,6 +91,30 @@ in
           description = "Nix trusted-users declared for this host.";
         };
 
+        userManagement.mutableUsers = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether local user state may diverge from declarative user definitions.";
+        };
+
+        userManagement.tmpfilesRules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Host tmpfiles rules associated with declarative user/home state.";
+        };
+
+        homeManager.useGlobalPkgs = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether Home Manager NixOS integration uses the system pkgs instance.";
+        };
+
+        homeManager.useUserPackages = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether Home Manager installs packages through user profiles.";
+        };
+
         storage.zfs = lib.mkOption {
           type = lib.types.bool;
           default = false;
