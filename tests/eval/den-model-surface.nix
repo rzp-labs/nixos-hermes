@@ -27,7 +27,6 @@ let
   missingLabCategories = builtins.filter (name: !(builtins.hasAttr name lab)) requiredLabCategories;
 
   expectedModuleImports = [
-    "den/hosts/nixos-hermes/hardware/default.nix"
     "den/hosts/nixos-hermes/storage/disk-config.nix"
     "den/hosts/nixos-hermes/platform/provision.nix"
     "den/hosts/nixos-hermes/services/llama-server.nix"
@@ -43,9 +42,7 @@ let
     "den/hosts/nixos-hermes/shared/home-manager.nix"
     "den/hosts/nixos-hermes/shared/users.nix"
   ];
-  expectedHardwareModules = [
-    "den/hosts/nixos-hermes/hardware/default.nix"
-  ];
+  expectedHardwareModules = [ ];
   expectedStorageModules = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
   ];
@@ -97,6 +94,27 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${builtins.concatStringsSep "," host.trustedUsers}' = 'admin'
   test '${builtins.concatStringsSep "," host.systemPackages}' = 'curl,wget,git,man,htop,iotop,tree,jq,python3,ripgrep,unzip,gh,bun,fh,repowise,repowise-nix,llm-agents.cli-proxy-api,llm-agents.but,uv'
   test '${boolString host.storage.zfs}' = 'true'
+  test '${boolString host.hardware.importNotDetected}' = 'true'
+  test '${builtins.concatStringsSep "," host.hardware.initrdAvailableKernelModules}' = 'xhci_pci,ahci,nvme,thunderbolt,usbhid,usb_storage,sd_mod,sr_mod'
+  test -z '${builtins.concatStringsSep "," host.hardware.initrdKernelModules}'
+  test '${builtins.concatStringsSep "," host.hardware.kernelModules}' = 'kvm-intel'
+  test '${builtins.concatStringsSep "," host.hardware.kernelParams}' = 'zfs.zfs_arc_max=17179869184,nvme_core.default_ps_max_latency_us=0'
+  test '${toString host.hardware.kernelSysctl."vm.swappiness"}' = '0'
+  test '${boolString host.hardware.zfsForceImportRoot}' = 'false'
+  test -z '${builtins.concatStringsSep "," host.hardware.extraModulePackages}'
+  test '${boolString host.hardware.boot.efiCanTouchVariables}' = 'true'
+  test '${boolString host.hardware.boot.systemdBootEnable}' = 'true'
+  test '${boolString host.hardware.boot.fallbackSync.enable}' = 'true'
+  test '${host.hardware.boot.fallbackSync.source}' = '/boot/'
+  test '${host.hardware.boot.fallbackSync.target}' = '/boot-fallback/'
+  test '${boolString host.hardware.enableRedistributableFirmware}' = 'true'
+  test '${boolString host.hardware.cpu.intel.updateMicrocodeFromRedistributableFirmware}' = 'true'
+  test '${boolString host.hardware.graphics.enable}' = 'true'
+  test '${builtins.concatStringsSep "," host.hardware.graphics.extraPackages}' = 'intel-media-driver,vpl-gpu-rt,intel-compute-runtime'
+  test '${toString (builtins.length host.hardware.swapDevices)}' = '0'
+  test '${host.hardware.cpuFreqGovernor}' = 'schedutil'
+  test '${boolString host.hardware.zfsMaintenance.autoScrub}' = 'true'
+  test '${boolString host.hardware.zfsMaintenance.trim}' = 'true'
   test '${host.storage.diskoConfigPath}' = 'den/hosts/nixos-hermes/storage/disk-config.nix'
   test '${boolString host.platform.virtualisation.docker.enable}' = 'true'
   test '${host.platform.virtualisation.docker.storageDriver}' = 'zfs'

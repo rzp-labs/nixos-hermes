@@ -97,7 +97,8 @@ selected by the Den host graph in `den/entities.nix`. There is no longer a
 `hosts/hermes/default.nix` entrypoint controlling the host import list.
 
 - hardware, boot, kernel, GPU, and ZFS service options:
-  - `den/hosts/nixos-hermes/hardware/default.nix`
+  - facts live under `den.hosts.x86_64-linux.nixos-hermes.hardware`
+  - rendered by `den.aspects.nixos-hermes.os`
 - Disko/ZFS layout:
   - `den/hosts/nixos-hermes/storage/disk-config.nix`
 - SOPS secret bindings:

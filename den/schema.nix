@@ -97,6 +97,138 @@ in
           description = "Whether current host configuration enables ZFS storage semantics.";
         };
 
+        hardware.importNotDetected = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether to import NixOS' installer scan/not-detected hardware module.";
+        };
+
+        hardware.initrdAvailableKernelModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Initrd kernel modules detected for early boot.";
+        };
+
+        hardware.initrdKernelModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Initrd kernel modules forced for this host.";
+        };
+
+        hardware.kernelModules = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Runtime kernel modules forced for this host.";
+        };
+
+        hardware.kernelParams = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Kernel parameters for this host.";
+        };
+
+        hardware.kernelSysctl = lib.mkOption {
+          type = lib.types.attrsOf lib.types.int;
+          default = { };
+          description = "Kernel sysctl values for this host.";
+        };
+
+        hardware.zfsForceImportRoot = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether ZFS root pools should be force-imported at boot.";
+        };
+
+        hardware.extraModulePackages = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Kernel module package attribute names for this host.";
+        };
+
+        hardware.boot.efiCanTouchVariables = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether systemd-boot may touch EFI variables.";
+        };
+
+        hardware.boot.systemdBootEnable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether systemd-boot is enabled.";
+        };
+
+        hardware.boot.fallbackSync = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Whether to sync the primary ESP to a fallback ESP after systemd-boot install.";
+              };
+              source = lib.mkOption {
+                type = lib.types.str;
+                default = "/boot/";
+                description = "Fallback sync source path.";
+              };
+              target = lib.mkOption {
+                type = lib.types.str;
+                default = "/boot-fallback/";
+                description = "Fallback sync target path.";
+              };
+            };
+          };
+          default = { };
+          description = "Fallback ESP synchronization settings.";
+        };
+
+        hardware.enableRedistributableFirmware = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether redistributable firmware is enabled.";
+        };
+
+        hardware.cpu.intel.updateMicrocodeFromRedistributableFirmware = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Whether Intel microcode follows the redistributable firmware setting.";
+        };
+
+        hardware.graphics.enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether NixOS graphics support is enabled.";
+        };
+
+        hardware.graphics.extraPackages = lib.mkOption {
+          type = pathList;
+          default = [ ];
+          description = "Graphics package attribute names for this host.";
+        };
+
+        hardware.swapDevices = lib.mkOption {
+          type = lib.types.listOf lib.types.attrs;
+          default = [ ];
+          description = "Swap device declarations for this host.";
+        };
+
+        hardware.cpuFreqGovernor = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "CPU frequency governor for this host.";
+        };
+
+        hardware.zfsMaintenance.autoScrub = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether ZFS auto-scrub is enabled.";
+        };
+
+        hardware.zfsMaintenance.trim = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Whether ZFS trim is enabled.";
+        };
+
         storage.diskoConfigPath = lib.mkOption {
           type = lib.types.str;
           description = "Repository-relative Disko configuration path for install-time tooling.";

@@ -10,9 +10,7 @@ in
 {
   den.hosts.x86_64-linux.nixos-hermes =
     let
-      hardwareModules = [
-        "den/hosts/nixos-hermes/hardware/default.nix"
-      ];
+      hardwareModules = [ ];
       storageModules = [
         "den/hosts/nixos-hermes/storage/disk-config.nix"
       ];
@@ -82,6 +80,55 @@ in
         "llm-agents.but"
         "uv"
       ];
+      hardware = {
+        importNotDetected = true;
+        initrdAvailableKernelModules = [
+          "xhci_pci"
+          "ahci"
+          "nvme"
+          "thunderbolt"
+          "usbhid"
+          "usb_storage"
+          "sd_mod"
+          "sr_mod"
+        ];
+        initrdKernelModules = [ ];
+        kernelModules = [ "kvm-intel" ];
+        kernelParams = [
+          "zfs.zfs_arc_max=17179869184"
+          "nvme_core.default_ps_max_latency_us=0"
+        ];
+        kernelSysctl = {
+          "vm.swappiness" = 0;
+        };
+        zfsForceImportRoot = false;
+        extraModulePackages = [ ];
+        boot = {
+          efiCanTouchVariables = true;
+          systemdBootEnable = true;
+          fallbackSync = {
+            enable = true;
+            source = "/boot/";
+            target = "/boot-fallback/";
+          };
+        };
+        enableRedistributableFirmware = true;
+        cpu.intel.updateMicrocodeFromRedistributableFirmware = true;
+        graphics = {
+          enable = true;
+          extraPackages = [
+            "intel-media-driver"
+            "vpl-gpu-rt"
+            "intel-compute-runtime"
+          ];
+        };
+        swapDevices = [ ];
+        cpuFreqGovernor = "schedutil";
+        zfsMaintenance = {
+          autoScrub = true;
+          trim = true;
+        };
+      };
       storage.zfs = true;
       storage.diskoConfigPath = "den/hosts/nixos-hermes/storage/disk-config.nix";
       platform.virtualisation = {
@@ -194,7 +241,13 @@ in
     };
 
   den.aspects.nixos-hermes.os =
-    { lib, pkgs, ... }:
+    {
+      lib,
+      pkgs,
+      modulesPath,
+      config,
+      ...
+    }:
     let
       vitePlusToolchain = with pkgs; [
         nodejs
@@ -224,6 +277,8 @@ in
       packageByName =
         name: lib.attrByPath (lib.splitString "." name) (throw "Unknown Den system package ${name}") pkgs;
       platformVirtualisationPackages = builtins.map packageByName host.platform.virtualisation.packages;
+      hardwareExtraModulePackages = builtins.map packageByName host.hardware.extraModulePackages;
+      hardwareGraphicsExtraPackages = builtins.map packageByName host.hardware.graphics.extraPackages;
       repoPath = path: ../. + "/${path}";
       renderSecret =
         _name: secret:
@@ -239,6 +294,10 @@ in
         };
     in
     {
+      imports = lib.optionals host.hardware.importNotDetected [
+        (modulesPath + "/installer/scan/not-detected.nix")
+      ];
+
       networking.hostName = host.name;
       networking.hostId = host.hostId;
       nix.settings.trusted-users = host.trustedUsers;
@@ -255,6 +314,37 @@ in
       services.thermald.enable = true;
       services.printing.enable = true;
       services.xserver.videoDrivers = [ "modesetting" ];
+
+      boot.initrd.availableKernelModules = host.hardware.initrdAvailableKernelModules;
+      boot.initrd.kernelModules = host.hardware.initrdKernelModules;
+      boot.kernelModules = host.hardware.kernelModules;
+      boot.kernelParams = host.hardware.kernelParams;
+      boot.kernel.sysctl = host.hardware.kernelSysctl;
+      boot.zfs.forceImportRoot = host.hardware.zfsForceImportRoot;
+      boot.extraModulePackages = hardwareExtraModulePackages;
+      boot.loader.efi.canTouchEfiVariables = host.hardware.boot.efiCanTouchVariables;
+      boot.loader.systemd-boot.enable = host.hardware.boot.systemdBootEnable;
+      boot.loader.systemd-boot.extraInstallCommands = lib.mkIf host.hardware.boot.fallbackSync.enable ''
+        ${pkgs.rsync}/bin/rsync -av --delete ${host.hardware.boot.fallbackSync.source} ${host.hardware.boot.fallbackSync.target}
+      '';
+
+      hardware.enableRedistributableFirmware = host.hardware.enableRedistributableFirmware;
+      hardware.cpu.intel.updateMicrocode = lib.mkDefault (
+        if host.hardware.cpu.intel.updateMicrocodeFromRedistributableFirmware then
+          config.hardware.enableRedistributableFirmware
+        else
+          false
+      );
+      hardware.graphics = {
+        enable = host.hardware.graphics.enable;
+        extraPackages = hardwareGraphicsExtraPackages;
+      };
+      swapDevices = host.hardware.swapDevices;
+      powerManagement.cpuFreqGovernor = lib.mkIf (
+        host.hardware.cpuFreqGovernor != null
+      ) host.hardware.cpuFreqGovernor;
+      services.zfs.autoScrub.enable = host.hardware.zfsMaintenance.autoScrub;
+      services.zfs.trim.enable = host.hardware.zfsMaintenance.trim;
 
       services.openssh.enable = true;
       services.openssh.hostKeys = [
