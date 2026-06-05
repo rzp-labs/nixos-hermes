@@ -91,15 +91,14 @@ nixos-hermes/
 │   └── hermes-secrets.yaml            # template; encrypt before committing
 ├── hosts/
 │   └── hermes/
-│       ├── default.nix                # host entry: identity constants + imports
 │       ├── disk-config.nix            # disko layout (imported; generates fileSystems.*)
 │       ├── hardware.nix               # boot, initrd, kernel, GPU, ZFS services
 │       ├── sops.nix                   # SOPS secret bindings
 │       └── secrets/                   # encrypted secret files (committed)
 └── modules/
-    ├── system.nix                     # locale, tz, networking, packages, sudo
+    ├── system.nix                     # marker; baseline rendered from Den
     ├── hermes-agent.nix               # hermes service declaration
-    └── users.nix                      # immutable user + SSH key definitions
+    └── users.nix                      # immutable-users flag; users/SSH rendered from Den
 ```
 
 ---
