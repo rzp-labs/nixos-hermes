@@ -28,7 +28,6 @@ let
 
   expectedModuleImports = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
-    "den/hosts/nixos-hermes/platform/provision.nix"
     "den/hosts/nixos-hermes/services/llama-server.nix"
     "den/hosts/nixos-hermes/services/hindsight-embed.nix"
     "den/hosts/nixos-hermes/services/hindsight-memory.nix"
@@ -47,9 +46,7 @@ let
     "den/hosts/nixos-hermes/storage/disk-config.nix"
   ];
   expectedSecretModules = [ ];
-  expectedPlatformModules = [
-    "den/hosts/nixos-hermes/platform/provision.nix"
-  ];
+  expectedPlatformModules = [ ];
   expectedServiceModules = [
     "den/hosts/nixos-hermes/services/llama-server.nix"
     "den/hosts/nixos-hermes/services/hindsight-embed.nix"
@@ -122,6 +119,15 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${boolString host.platform.virtualisation.libvirt.enable}' = 'true'
   test '${builtins.concatStringsSep "," host.platform.virtualisation.rootEquivalentGroups}' = 'docker,libvirtd'
   test '${builtins.concatStringsSep "," host.platform.virtualisation.packages}' = 'docker-compose,lazydocker,virtiofsd'
+  test '${boolString host.platform.provisioning.soul.enable}' = 'true'
+  test '${builtins.concatStringsSep "," host.platform.provisioning.soul.after}' = 'hermes-agent-setup,setupSecrets'
+  test '${host.platform.provisioning.soul.secretName}' = 'hermes-soul-md'
+  test '${host.platform.provisioning.soul.relativePath}' = '.hermes/SOUL.md'
+  test '${boolString host.platform.provisioning.githubAuth.enable}' = 'true'
+  test '${builtins.concatStringsSep "," host.platform.provisioning.githubAuth.after}' = 'hermes-agent-setup,setupSecrets,users'
+  test '${host.platform.provisioning.githubAuth.secretName}' = 'hermes-env'
+  test '${host.platform.provisioning.githubAuth.tokenVariable}' = 'GITHUB_TOKEN'
+  test '${host.platform.provisioning.githubAuth.username}' = 'yui-hermes'
   test '${host.secrets.defaultSopsFile}' = 'den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml'
   test '${host.secrets.ageKeyFile}' = '/etc/secrets/age.key'
   test -z '${builtins.concatStringsSep "," host.secrets.ageSshKeyPaths}'

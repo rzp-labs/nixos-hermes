@@ -15,9 +15,7 @@ in
         "den/hosts/nixos-hermes/storage/disk-config.nix"
       ];
       secretModules = [ ];
-      platformModules = [
-        "den/hosts/nixos-hermes/platform/provision.nix"
-      ];
+      platformModules = [ ];
       serviceModules = [
         "den/hosts/nixos-hermes/services/llama-server.nix"
         "den/hosts/nixos-hermes/services/hindsight-embed.nix"
@@ -147,6 +145,32 @@ in
           "lazydocker"
           "virtiofsd"
         ];
+      };
+      platform.provisioning = {
+        soul = {
+          enable = true;
+          after = [
+            "hermes-agent-setup"
+            "setupSecrets"
+          ];
+          secretName = "hermes-soul-md";
+          relativePath = ".hermes/SOUL.md";
+          directoryMode = "0750";
+          fileMode = "0640";
+        };
+        githubAuth = {
+          enable = true;
+          after = [
+            "hermes-agent-setup"
+            "setupSecrets"
+            "users"
+          ];
+          secretName = "hermes-env";
+          tokenVariable = "GITHUB_TOKEN";
+          username = "yui-hermes";
+          gitCredentialsRelativePath = ".git-credentials";
+          ghConfigRelativeDir = ".config/gh";
+        };
       };
       secrets = {
         defaultSopsFile = "den/hosts/nixos-hermes/secrets/payload/hermes-secrets.yaml";
@@ -358,6 +382,98 @@ in
       sops.age.keyFile = host.secrets.ageKeyFile;
       sops.age.sshKeyPaths = host.secrets.ageSshKeyPaths;
       sops.secrets = lib.mapAttrs renderSecret host.secrets.bindings;
+
+      system.activationScripts.hermes-soul-md = lib.mkIf host.platform.provisioning.soul.enable (
+        lib.stringAfter host.platform.provisioning.soul.after ''
+          soul_path=${config.services.hermes-agent.stateDir}/${host.platform.provisioning.soul.relativePath}
+          soul_dir=$(dirname "$soul_path")
+          # Create .hermes/ with hermes ownership before install so the service
+          # user can write into the directory once it starts.
+          if [ ! -d "$soul_dir" ]; then
+            install -d \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              -m ${host.platform.provisioning.soul.directoryMode} \
+              "$soul_dir"
+          fi
+          if [ ! -f "$soul_path" ]; then
+            install \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              -m ${host.platform.provisioning.soul.fileMode} \
+              ${config.sops.secrets.${host.platform.provisioning.soul.secretName}.path} "$soul_path"
+          fi
+        ''
+      );
+
+      system.activationScripts.hermes-github-auth = lib.mkIf host.platform.provisioning.githubAuth.enable (
+        lib.stringAfter host.platform.provisioning.githubAuth.after ''
+          state_dir=${config.services.hermes-agent.stateDir}
+          creds_path=$state_dir/${host.platform.provisioning.githubAuth.gitCredentialsRelativePath}
+          gh_config_dir=$state_dir/${host.platform.provisioning.githubAuth.ghConfigRelativeDir}
+          gh_parent_dir=$(dirname "$gh_config_dir")
+          gh_hosts_path=$gh_config_dir/hosts.yml
+          gh_config_path=$gh_config_dir/config.yml
+          token=$(grep "^${host.platform.provisioning.githubAuth.tokenVariable}=" ${
+            config.sops.secrets.${host.platform.provisioning.githubAuth.secretName}.path
+          } | cut -d= -f2-)
+          # Strip surrounding double quotes using bash parameter expansion —
+          # sed is not available in the activation script PATH.
+          token=''${token#\"}
+          token=''${token%\"}
+
+          if [ -n "$token" ]; then
+            # Create with correct ownership and mode atomically before writing
+            # content — avoids a race where credentials are briefly readable by
+            # another user.
+            install -D -m 600 \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              /dev/null "$creds_path"
+            printf 'https://${host.platform.provisioning.githubAuth.username}:%s@github.com\n' "$token" > "$creds_path"
+
+            install -d \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              -m 0700 \
+              "$gh_parent_dir"
+            chmod u=rwx,go=,g-s "$gh_parent_dir"
+
+            install -d \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              -m 0700 \
+              "$gh_config_dir"
+            chmod u=rwx,go=,g-s "$gh_config_dir"
+
+            install -m 600 \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              /dev/null "$gh_hosts_path"
+            printf '%s\n' \
+              'github.com:' \
+              "    oauth_token: $token" \
+              '    user: ${host.platform.provisioning.githubAuth.username}' \
+              '    git_protocol: https' \
+              > "$gh_hosts_path"
+
+            install -m 600 \
+              -o ${config.services.hermes-agent.user} \
+              -g ${config.services.hermes-agent.group} \
+              /dev/null "$gh_config_path"
+          else
+            # Token removed from secret — revoke files so stale credentials
+            # do not persist on disk.
+            rm -f "$creds_path" "$gh_hosts_path" "$gh_config_path"
+          fi
+
+          # Smoke-test that gh can read its configured token without requiring
+          # network access. This catches malformed hosts.yml during activation.
+          if [ -f "$gh_hosts_path" ]; then
+            HOME=$state_dir ${pkgs.gh}/bin/gh auth token >/dev/null
+          fi
+        ''
+      );
 
       services.dbus.implementation = "dbus";
       security.sudo.wheelNeedsPassword = false;

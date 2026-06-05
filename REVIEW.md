@@ -105,7 +105,8 @@ selected by the Den host graph in `den/entities.nix`. There is no longer a
   - facts live under `den.hosts.x86_64-linux.nixos-hermes.secrets`
   - rendered by `den.aspects.nixos-hermes.os`
 - host activation/provisioning scripts:
-  - `den/hosts/nixos-hermes/platform/provision.nix`
+  - facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.provisioning`
+  - rendered by `den.aspects.nixos-hermes.os`
 - Docker/libvirt substrate:
   - facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.virtualisation`
   - rendered by `den.aspects.nixos-hermes.os`

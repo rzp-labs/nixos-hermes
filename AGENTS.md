@@ -40,7 +40,7 @@ nixos-hermes/
 └── den/hosts/nixos-hermes/              # Den-owned host modules and encrypted payloads
     ├── storage/disk-config.nix          # disko layout (imported; generates fileSystems.*)
     ├── secrets/payload/                 # committed SOPS-encrypted files
-    ├── platform/                        # activation/provisioning and virtualisation substrate
+    ├── platform/                        # host platform leaves still awaiting Den rendering
     ├── services/                        # host runtime services
     └── shared/                          # host-selected shared NixOS modules
 ```
@@ -278,7 +278,7 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
   config, or host-service migrations here without a follow-up issue and eval/VM
   proof. Current Den-rendered production scope is users, SSH keys, Home Manager,
   host/system baseline, hardware, SOPS/secrets, virtualization, and install-time
-  Disko path facts. Disko/ZFS layout, provisioning scripts, package overlay
+  Disko path facts, and provisioning scripts. Disko/ZFS layout, package overlay
   definitions, and service runtime modules remain native host imports.
 
 ### `checks/pre-commit.nix`
@@ -360,14 +360,15 @@ After first install:
 - Docker group access is root-equivalent on this host. Adding `hermes` to `docker` is a deliberate operational trust decision for container-first workload proving, not a sandbox boundary.
 - The Docker ZFS storage driver is for the bare-metal ZFS host only. Guest Docker inside VMs/microVMs should use overlay2 on ext4/xfs to avoid stacked CoW over host ZFS.
 
-### `den/hosts/nixos-hermes/platform/provision.nix`
+### Den provisioning facts
 
-*Host-specific activation scripts. Two categories:*
+*Host-specific activation scripts rendered from Den.*
 
-- **One-shot provisioning:** activation scripts with a file-existence guard that run once on first boot to seed runtime state. Rebuilds do not clobber runtime-evolved state. To re-provision: delete the target file on the host, then rebuild.
-- **Recurring refresh:** activation scripts with no guard that run on every activation. Used for credentials and other state that must stay in sync with sops secrets.
-- Lives under `den/hosts/nixos-hermes/platform/` because provisioning is host-specific,
-  not portable across hosts.
+- Facts live under `den.hosts.x86_64-linux.nixos-hermes.platform.provisioning`.
+- `den.aspects.nixos-hermes.os` renders one-shot SOUL.md seeding and recurring GitHub credential refresh.
+- **One-shot provisioning:** activation scripts with a file-existence guard run once on first boot to seed runtime state. Rebuilds do not clobber runtime-evolved state. To re-provision: delete the target file on the host, then rebuild.
+- **Recurring refresh:** activation scripts with no guard run on every activation. Used for credentials and other state that must stay in sync with sops secrets.
+- These facts are host-specific and not portable across hosts.
 - To re-provision a file: delete it on the host, then rebuild.
 
 ### `den/hosts/nixos-hermes/shared/packages.nix`

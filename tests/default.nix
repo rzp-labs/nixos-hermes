@@ -117,6 +117,7 @@ let
       imports = [
         sops-nix.nixosModules.sops
         home-manager.nixosModules.home-manager
+        hermes-agent.nixosModules.default
         denHost.mainModule
       ];
 
@@ -127,6 +128,12 @@ let
       sops.age.sshKeyPaths = lib.mkForce [ ];
       sops.defaultSopsFile = lib.mkForce testSecretsFile;
       sops.secrets = lib.mkForce { };
+
+      # The general Den host VM smoke does not decrypt or seed real Hermes
+      # runtime state. Provisioning scripts are covered by activation-focused
+      # VM tests with test secrets.
+      system.activationScripts.hermes-soul-md = lib.mkForce "";
+      system.activationScripts.hermes-github-auth = lib.mkForce "";
 
       # The real host creates some groups via imported service modules. This VM
       # declares host-local group targets directly so user assertions stay
@@ -229,12 +236,27 @@ in
     name = "activation-github-auth";
 
     nodes.machine =
-      { ... }:
+      { lib, ... }:
       {
         imports = [
           hermesBaseModule
-          ../den/hosts/nixos-hermes/platform/provision.nix
+          denHost.mainModule
         ];
+
+        system.stateVersion = lib.mkForce "25.11";
+        sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
+        sops.age.sshKeyPaths = lib.mkForce [ ];
+        sops.defaultSopsFile = lib.mkForce testSecretsFile;
+        sops.secrets = lib.mkForce {
+          "hermes-env" = {
+            owner = "hermes";
+            mode = "0400";
+          };
+          "hermes-soul-md" = {
+            owner = "hermes";
+            mode = "0440";
+          };
+        };
       };
 
     testScript = ''

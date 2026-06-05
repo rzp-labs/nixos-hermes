@@ -270,6 +270,88 @@ in
           description = "Host package names required by the virtualisation substrate.";
         };
 
+        platform.provisioning.soul = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Whether to seed Hermes SOUL.md from a SOPS secret on first activation.";
+              };
+              after = lib.mkOption {
+                type = pathList;
+                default = [ ];
+                description = "Activation script dependencies for SOUL.md seeding.";
+              };
+              secretName = lib.mkOption {
+                type = lib.types.str;
+                default = "hermes-soul-md";
+                description = "sops-nix secret name containing the SOUL.md source.";
+              };
+              relativePath = lib.mkOption {
+                type = lib.types.str;
+                default = ".hermes/SOUL.md";
+                description = "Path under the Hermes state directory to seed.";
+              };
+              directoryMode = lib.mkOption {
+                type = lib.types.str;
+                default = "0750";
+                description = "Mode for the parent Hermes state subdirectory.";
+              };
+              fileMode = lib.mkOption {
+                type = lib.types.str;
+                default = "0640";
+                description = "Mode for the seeded SOUL.md file.";
+              };
+            };
+          };
+          default = { };
+          description = "Hermes SOUL.md one-shot provisioning facts.";
+        };
+
+        platform.provisioning.githubAuth = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = false;
+                description = "Whether to refresh Hermes GitHub credentials from the Hermes env secret on every activation.";
+              };
+              after = lib.mkOption {
+                type = pathList;
+                default = [ ];
+                description = "Activation script dependencies for GitHub credential refresh.";
+              };
+              secretName = lib.mkOption {
+                type = lib.types.str;
+                default = "hermes-env";
+                description = "sops-nix env secret containing the GitHub token variable.";
+              };
+              tokenVariable = lib.mkOption {
+                type = lib.types.str;
+                default = "GITHUB_TOKEN";
+                description = "Environment variable name to read from the env secret.";
+              };
+              username = lib.mkOption {
+                type = lib.types.str;
+                description = "GitHub username written to git and gh credential files.";
+              };
+              gitCredentialsRelativePath = lib.mkOption {
+                type = lib.types.str;
+                default = ".git-credentials";
+                description = "Credential helper file path under the Hermes state directory.";
+              };
+              ghConfigRelativeDir = lib.mkOption {
+                type = lib.types.str;
+                default = ".config/gh";
+                description = "GitHub CLI config directory under the Hermes state directory.";
+              };
+            };
+          };
+          default = { };
+          description = "Hermes GitHub credential refresh provisioning facts.";
+        };
+
         secrets.defaultSopsFile = lib.mkOption {
           type = lib.types.str;
           description = "Repository-relative default SOPS file for this host.";
