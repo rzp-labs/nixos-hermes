@@ -89,7 +89,7 @@ started_at = os.environ["AGENTMEMORY_SMOKE_STARTED_AT"]
 stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 marker = f"agentmemory-smoke-{stamp}"
 session_id = f"{marker}-session"
-file_path = os.path.join(project, "hosts/hermes/agentmemory.nix")
+file_path = os.path.join(project, "den/hosts/nixos-hermes/services/agentmemory.nix")
 
 
 def request(method, path, payload=None, timeout_override=None):

@@ -1,7 +1,7 @@
 { ... }:
 
 {
-  sops.defaultSopsFile = ../../../../hosts/hermes/secrets/hermes-secrets.yaml;
+  sops.defaultSopsFile = ./payload/hermes-secrets.yaml;
   sops.age.keyFile = "/etc/secrets/age.key";
   # The SSH host key is itself a sops-managed secret; using it as an age
   # identity creates a circular dependency. Use only the age key file.
@@ -12,7 +12,7 @@
     # Stable SSH host key — same fingerprint survives rebuilds.
     # sops-nix decrypts and places this at runtime; no pre-placement needed.
     ssh_host_ed25519_key = {
-      sopsFile = ../../../../hosts/hermes/secrets/ssh_host_ed25519_key.enc;
+      sopsFile = ./payload/ssh_host_ed25519_key.enc;
       format = "binary";
       owner = "root";
       mode = "0600";
@@ -41,7 +41,7 @@
     # LLM providers. The key is consumed at runtime by managed services, not
     # written into the Nix store.
     cliproxyapi-key = {
-      sopsFile = ../../../../hosts/hermes/secrets/cliproxyapi-key.enc;
+      sopsFile = ./payload/cliproxyapi-key.enc;
       format = "binary";
       owner = "agentmemory";
       group = "agentmemory";
@@ -52,7 +52,7 @@
     # Decrypted by sops-nix at activation; the hermes-soul-md script provisions
     # it to $HERMES_HOME on first boot only.
     hermes-soul-md = {
-      sopsFile = ../../../../hosts/hermes/secrets/soul.md;
+      sopsFile = ./payload/soul.md;
       format = "binary";
       owner = "hermes";
       mode = "0440";
@@ -61,7 +61,7 @@
     # Netdata Cloud claim.conf. Contains the cloud URL, claim token, and room
     # binding; installed into /etc/netdata/claim.conf by netdata.service.
     netdata-claim-conf = {
-      sopsFile = ../../../../hosts/hermes/secrets/netdata-claim.conf;
+      sopsFile = ./payload/netdata-claim.conf;
       format = "binary";
       owner = "root";
       group = "netdata";
