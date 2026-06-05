@@ -97,61 +97,41 @@ let
 
   denHost = denModel.den.hosts.x86_64-linux.nixos-hermes;
   denAdmin = denHost.users.admin;
-  denHermes = denHost.users.hermes;
   denPoc = denHost.users.den-poc;
 
   denHostVmModule =
     { lib, ... }:
     {
-      imports = [ home-manager.nixosModules.home-manager ];
+      imports = [
+        home-manager.nixosModules.home-manager
+        denHost.mainModule
+      ];
+      nixpkgs.overlays = lib.mkForce [
+        (_final: prev: {
+          repowise = prev.hello;
+          repowise-nix = prev.hello;
+          fh = prev.hello;
+          llm-agents = (prev.llm-agents or { }) // {
+            cli-proxy-api = prev.hello;
+            but = prev.hello;
+          };
+          vite-plus = prev.hello;
+        })
+      ];
 
-      networking.hostName = denHost.name;
-      system.stateVersion = denHost.stateVersion;
-      services.openssh.enable = true;
-
-      users.mutableUsers = false;
-      # The real host creates some groups via imported service modules. This
-      # VM harness declares Den-modeled group targets directly so user-shape
-      # assertions remain independent from unrelated service migrations.
+      # The real host creates some groups via imported service modules. This VM
+      # declares host-local group targets directly so user assertions stay
+      # independent from service migrations.
       users.groups.networkmanager = { };
-      users.users.admin = {
-        isNormalUser = denAdmin.normalUser;
-        home = lib.mkIf (denAdmin.home != null) denAdmin.home;
-        createHome = lib.mkIf (denAdmin.createHome != null) denAdmin.createHome;
-        homeMode = lib.mkIf (denAdmin.homeMode != null) denAdmin.homeMode;
-        extraGroups = denAdmin.extraGroups;
-        openssh.authorizedKeys.keys = lib.mkIf denAdmin.sshAuthorizedKeysConfigured [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDenVmAdminKeyForShapeOnly000000000000000000"
-        ];
-      };
       users.groups.hermes = { };
       users.users.hermes = {
         isSystemUser = true;
         group = "hermes";
-        openssh.authorizedKeys.keys = lib.mkIf denHermes.sshAuthorizedKeysConfigured [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDenVmHermesKeyForShapeOnly00000000000000000"
-        ];
-      };
-      users.users.den-poc = {
-        isNormalUser = denPoc.normalUser;
-        home = lib.mkIf (denPoc.home != null) denPoc.home;
-        createHome = lib.mkIf (denPoc.createHome != null) denPoc.createHome;
       };
 
       security.sudo.wheelNeedsPassword = false;
-      home-manager.useGlobalPkgs = true;
-      home-manager.useUserPackages = true;
-      home-manager.users.admin = lib.mkIf denAdmin.hasHomeManagerConfig {
-        home.stateVersion = denHost.stateVersion;
-      };
-      home-manager.users.hermes = lib.mkIf denHermes.hasHomeManagerConfig {
-        home.stateVersion = denHost.stateVersion;
-      };
       home-manager.users.den-poc = lib.mkIf denPoc.hasHomeManagerConfig {
         imports = [
-          ((builtins.elemAt denModel.den.aspects.den-poc.homeManager.__contentValues 0).value {
-            inherit pkgs;
-          })
           # Native Home Manager config deliberately remains alongside the
           # Den-rendered module for the same user. This proves per-user
           # incremental migration, not just different users on different paths.
@@ -184,14 +164,14 @@ in
       machine.succeed("test -d /home/admin")
       machine.succeed("stat -c%a /home/admin | grep -qx 700")
       machine.succeed("test -f /etc/ssh/authorized_keys.d/admin")
+      machine.succeed("grep -Fx '${builtins.head denAdmin.sshAuthorizedKeys}' /etc/ssh/authorized_keys.d/admin")
       machine.succeed("test -f /etc/ssh/authorized_keys.d/hermes")
-      machine.succeed("test -L /etc/profiles/per-user/admin")
-      machine.succeed("test -L /etc/profiles/per-user/hermes")
-      machine.succeed("test -L /etc/profiles/per-user/den-poc")
-      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/glow")
-      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/bat")
-      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/glow --version")
-      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/bat --version")
+      machine.succeed("systemctl is-active --quiet home-manager-admin.service")
+      machine.succeed("systemctl list-units --plain --state=active 'home-manager-*' | grep -F 'Home Manager environment for den-poc'")
+      machine.succeed("test -x /home/den-poc/.nix-profile/bin/glow")
+      machine.succeed("test -x /home/den-poc/.nix-profile/bin/bat")
+      machine.succeed("runuser -u den-poc -- /home/den-poc/.nix-profile/bin/glow --version")
+      machine.succeed("runuser -u den-poc -- /home/den-poc/.nix-profile/bin/bat --version")
     '';
   };
 

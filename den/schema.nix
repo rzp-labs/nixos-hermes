@@ -30,9 +30,35 @@ in
           description = "Configured nixpkgs host platform for this host.";
         };
 
+        hostId = lib.mkOption {
+          type = lib.types.str;
+          description = "Configured networking.hostId for this host.";
+        };
+
         stateVersion = lib.mkOption {
           type = lib.types.str;
           description = "Configured NixOS stateVersion for this host.";
+        };
+
+        timeZone = lib.mkOption {
+          type = lib.types.str;
+          description = "Configured system time zone.";
+        };
+
+        defaultLocale = lib.mkOption {
+          type = lib.types.str;
+          description = "Configured default locale.";
+        };
+
+        consoleKeyMap = lib.mkOption {
+          type = lib.types.str;
+          description = "Configured console keymap.";
+        };
+
+        systemPackages = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Host baseline package attribute names.";
         };
 
         trustedUsers = lib.mkOption {
@@ -89,11 +115,12 @@ in
           description = "Mirrors users.users.<name>.extraGroups.";
         };
 
-        sshAuthorizedKeysConfigured = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Whether users.users.<name>.openssh.authorizedKeys.keys is non-empty.";
+        sshAuthorizedKeys = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Mirrors users.users.<name>.openssh.authorizedKeys.keys.";
         };
+
       };
     }
   ];

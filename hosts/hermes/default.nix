@@ -1,5 +1,3 @@
-{ lib, ... }:
-
 {
   imports = [
     ./hardware.nix
@@ -20,15 +18,4 @@
     ../../modules/hermes-plugins.nix
     ../../modules/users.nix
   ];
-
-  # Host identity — these are machine-specific constants that must not be
-  # shared across hosts or extracted into modules.
-  networking.hostName = "nixos-hermes";
-  # ZFS hostId ties the pool to this machine; changing it requires pool export/import.
-  networking.hostId = "52dd4e5a";
-
-  system.stateVersion = "25.05";
-
-  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  nix.settings.trusted-users = [ "admin" ];
 }

@@ -63,6 +63,7 @@
     in
     {
       nixosConfigurations.nixos-hermes = nixpkgs.lib.nixosSystem {
+        system = self.denModel.den.hosts.x86_64-linux.nixos-hermes.nixpkgsHostPlatform;
         specialArgs = {
           inherit
             inputs
@@ -77,6 +78,7 @@
           disko.nixosModules.default
           home-manager.nixosModules.home-manager
           hermes-agent.nixosModules.default
+          self.denModel.den.hosts.x86_64-linux.nixos-hermes.mainModule
           ./hosts/hermes
         ];
       };
