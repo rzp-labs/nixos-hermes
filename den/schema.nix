@@ -429,6 +429,83 @@ in
           description = "Hindsight retain/reflect LLM route facts for the retired memory substrate.";
         };
 
+        services.agentMemory = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Whether the Agent Memory observer service is enabled.";
+              };
+              stateDir = lib.mkOption {
+                type = lib.types.str;
+                default = "/var/lib/agentmemory";
+                description = "Agent Memory state directory.";
+              };
+              cacheDir = lib.mkOption {
+                type = lib.types.str;
+                default = "/var/cache/agentmemory";
+                description = "Agent Memory cache directory.";
+              };
+              restPort = lib.mkOption {
+                type = lib.types.port;
+                default = 3111;
+                description = "Agent Memory REST API port.";
+              };
+              streamsPort = lib.mkOption {
+                type = lib.types.port;
+                default = 3112;
+                description = "Agent Memory stream worker port.";
+              };
+              viewerPort = lib.mkOption {
+                type = lib.types.port;
+                default = 3113;
+                description = "Agent Memory viewer port.";
+              };
+              enginePort = lib.mkOption {
+                type = lib.types.port;
+                default = 49134;
+                description = "iii-engine worker manager port.";
+              };
+              llm = lib.mkOption {
+                type = lib.types.submodule {
+                  options = {
+                    enable = lib.mkOption {
+                      type = lib.types.bool;
+                      default = true;
+                      description = "Whether Agent Memory LLM enrichment is enabled.";
+                    };
+                    baseUrl = lib.mkOption {
+                      type = lib.types.str;
+                      default = "http://127.0.0.1:4000";
+                      description = "Root URL for Agent Memory's OpenAI-compatible provider.";
+                    };
+                    model = lib.mkOption {
+                      type = lib.types.str;
+                      default = "gpt-5.4-mini";
+                      description = "OpenAI-compatible chat model for Agent Memory enrichment.";
+                    };
+                    timeoutMs = lib.mkOption {
+                      type = lib.types.ints.positive;
+                      default = 120000;
+                      description = "Agent Memory LLM request timeout in milliseconds.";
+                    };
+                    embeddingProvider = lib.mkOption {
+                      type = lib.types.str;
+                      default = "local";
+                      description = "Embedding provider while chat LLM calls use the gateway.";
+                    };
+                  };
+                };
+                default = { };
+                description = "Agent Memory LLM enrichment facts.";
+              };
+            };
+          };
+          default = { };
+          description = "Agent Memory service facts.";
+        };
+
         services.ompAuthGateway = lib.mkOption {
           type = lib.types.submodule {
             options = {

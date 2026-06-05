@@ -28,7 +28,6 @@ let
 
   expectedModuleImports = [
     "den/hosts/nixos-hermes/storage/disk-config.nix"
-    "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
@@ -40,7 +39,6 @@ let
   expectedSecretModules = [ ];
   expectedPlatformModules = [ ];
   expectedServiceModules = [
-    "den/hosts/nixos-hermes/services/agentmemory.nix"
     "den/hosts/nixos-hermes/services/netdata.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/default.nix"
     "den/hosts/nixos-hermes/services/hermes-agent/plugins.nix"
@@ -134,6 +132,18 @@ pkgs.runCommand "den-model-surface" { } ''
   test '${host.services.ompAuthGateway.fallbackModel}' = 'gemini-3-flash-agent'
   test '${host.services.ompAuthGateway.delegationModel}' = 'gemini-3-flash-agent'
   test '${host.services.ompAuthGateway.localApiKey}' = 'local-auth-gateway'
+  test '${if host.services.agentMemory.enable then "true" else "false"}' = 'true'
+  test '${host.services.agentMemory.stateDir}' = '/var/lib/agentmemory'
+  test '${host.services.agentMemory.cacheDir}' = '/var/cache/agentmemory'
+  test '${toString host.services.agentMemory.restPort}' = '3111'
+  test '${toString host.services.agentMemory.streamsPort}' = '3112'
+  test '${toString host.services.agentMemory.viewerPort}' = '3113'
+  test '${toString host.services.agentMemory.enginePort}' = '49134'
+  test '${if host.services.agentMemory.llm.enable then "true" else "false"}' = 'true'
+  test '${host.services.agentMemory.llm.baseUrl}' = 'http://127.0.0.1:4000'
+  test '${host.services.agentMemory.llm.model}' = 'gpt-5.4-mini'
+  test '${toString host.services.agentMemory.llm.timeoutMs}' = '120000'
+  test '${host.services.agentMemory.llm.embeddingProvider}' = 'local'
   test '${boolString host.services.hindsightMemory.llama.enable}' = 'false'
   test '${host.services.hindsightMemory.llama.modelPath}' = '/var/lib/hermes/models/google_gemma-4-E2B-it-Q6_K_L.gguf'
   test '${host.services.hindsightMemory.llama.host}' = '127.0.0.1'
