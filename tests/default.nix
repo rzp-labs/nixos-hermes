@@ -157,6 +157,12 @@ let
       security.sudo.wheelNeedsPassword = false;
       den.fixtures.denPoc.enable = true;
 
+      # NixOS tests provide an already-constructed pkgs instance, which makes
+      # nixpkgs.* options read-only in the guest module graph. The host still
+      # renders overlays at normal priority so co-imported overlays merge; the
+      # VM uses the supplied pkgs and must not re-declare them.
+      nixpkgs.overlays = lib.mkForce [ ];
+
       # Override docker storage driver and netdata run directory for VM compatibility.
       virtualisation.docker.storageDriver = lib.mkForce "overlay2";
       services.netdata.config.global."run directory" = "/run/netdata";
@@ -213,6 +219,7 @@ in
       machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/bat --version")
       machine.succeed("runuser -u admin -- script -qec '/etc/profiles/per-user/admin/bin/yazi --version' /tmp/yazi-version >/dev/null 2>&1 && grep -qi 'yazi' /tmp/yazi-version")
       machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/omp --version")
+      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/home-manager --help")
       machine.succeed("systemctl list-units --plain --state=active 'home-manager-*' | grep -F 'Home Manager environment for den-poc'")
       machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/glow")
       machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/bat")
@@ -283,6 +290,11 @@ in
         ];
 
         system.stateVersion = lib.mkForce "25.11";
+        # NixOS tests provide an already-constructed pkgs instance, which makes
+        # nixpkgs.* options read-only in the guest module graph. The host still
+        # renders overlays at normal priority so co-imported overlays merge; the
+        # VM uses the supplied pkgs and must not re-declare them.
+        nixpkgs.overlays = lib.mkForce [ ];
         sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
         sops.age.sshKeyPaths = lib.mkForce [ ];
         sops.defaultSopsFile = lib.mkForce testSecretsFile;

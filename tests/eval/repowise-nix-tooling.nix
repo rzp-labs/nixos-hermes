@@ -18,9 +18,6 @@ let
   );
   adminHome = hostConfig.home-manager.users.admin;
   adminHomePackages = builtins.concatStringsSep "\n" (map toString adminHome.home.packages);
-  adminHomePackageNames = builtins.concatStringsSep "\n" (
-    map (pkg: pkg.name or "") adminHome.home.packages
-  );
   adminHomeSessionPath = builtins.concatStringsSep "\n" adminHome.home.sessionPath;
   adminBashInit = adminHome.programs.bash.initExtra;
 in
@@ -95,6 +92,9 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   ${adminHomePackages}
   EOF
   grep -q -- '${hostPkgs.llm-agents.omp}' <<'EOF'
+  ${adminHomePackages}
+  EOF
+  grep -q -- '${hostPkgs.home-manager}' <<'EOF'
   ${adminHomePackages}
   EOF
   grep -q -- '.vite-plus/bin' <<'EOF'

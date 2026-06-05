@@ -572,6 +572,13 @@ in
           "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG3neF+6qsDFb1pwr06mdW0mqMcxquAGNsjbGiG/Rj23"
         ];
         classes = [ "homeManager" ];
+        homePackages = [
+          "bat"
+          "glow"
+          "yazi"
+          "llm-agents.omp"
+          "home-manager"
+        ];
       };
 
       users.hermes = {
@@ -689,6 +696,7 @@ in
       hardwareGraphicsExtraPackages = builtins.map packageByName host.hardware.graphics.extraPackages;
       hermesExtraPackages = builtins.map packageByName host.services.hermesAgent.extraPackages;
       hermesPluginExtraPackages = builtins.map packageByName host.services.hermesAgentPlugins.extraPackages;
+      adminHomePackages = builtins.map packageByName admin.homePackages;
       repoPath = path: ../. + "/${path}";
       renderSecret =
         _name: secret:
@@ -2378,7 +2386,7 @@ in
         allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) host.nixpkgs.allowedUnfree;
       };
 
-      nixpkgs.overlays = lib.mkDefault [
+      nixpkgs.overlays = [
         # llm-agents.nix provides claude-code, codex, omp, agent-browser, and many more.
         # Use the default overlay for the fast-moving main input so npm packages build
         # with llm-agents' own compatible nixpkgs; GitButler is overridden below from
@@ -2930,14 +2938,7 @@ in
         admin = pkgs.lib.recursiveUpdate sharedUserConfig direnvConfig // {
           home = vitePlusHome // {
             stateVersion = "25.05";
-            packages =
-              (with pkgs; [
-                bat
-                glow
-                yazi
-                llm-agents.omp
-              ])
-              ++ vitePlusToolchain;
+            packages = adminHomePackages ++ vitePlusToolchain;
             sessionVariables = {
               XDG_DATA_HOME = "$HOME/.local/share";
               XDG_STATE_HOME = "$HOME/.local/state";

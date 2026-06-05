@@ -28,13 +28,10 @@ in
 }
 // lib.optionalAttrs (system == "x86_64-linux") (
   let
-    hostDiskoDevicesJson = pkgs.writeText "nixos-hermes-disko-devices.json" (
-      builtins.toJSON hostDiskoDevices
-    );
     hostDiskoConfig = pkgs.writeText "nixos-hermes-disko.nix" ''
       { ... }:
       {
-        disko.devices = builtins.fromJSON (builtins.readFile ${hostDiskoDevicesJson});
+        disko.devices = ${builtins.toJSON hostDiskoDevices};
       }
     '';
     diskoHermes = pkgs.writeShellApplication {
