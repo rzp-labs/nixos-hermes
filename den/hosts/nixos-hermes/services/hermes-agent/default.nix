@@ -19,7 +19,7 @@
     # playwright-driver.browsers: NixOS-wrapped browser binaries for the browser toolset.
     # ffmpeg: audio processing for ElevenLabs TTS voice bubble delivery.
     # ripgrep: fast search used by file and terminal toolsets.
-    # libopus: pins the store path referenced by the opus ctypes shim (see modules/packages.nix).
+    # libopus: pins the store path referenced by the opus ctypes shim (see den/hosts/nixos-hermes/shared/packages.nix).
     # claude-code, codex: AI coding agents — nixpkgs provides both as of May 2026.
     # bun: JavaScript runtime, package manager, and build tool.
     # linear-cli: API-key-backed Linear control plane for headless agent workflows.

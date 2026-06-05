@@ -16,11 +16,11 @@ This is promoted from spike to host infrastructure for the personal assistant ho
 
 ## Owning files
 
-- `hosts/hermes/hindsight-memory.nix` — host-local enablement and Hermes provider wiring.
-- `hosts/hermes/llama-server.nix` — llama.cpp service options and unit.
-- `hosts/hermes/hindsight-embed.nix` — PostgreSQL/Hindsight API service and writable venv setup.
-- `modules/packages.nix` — `opusCtypesShim`, the CPython `ctypes.util.find_library("opus")` workaround consumed through `PYTHONPATH`.
-- `modules/hermes-plugins.nix` — packaged Hermes runtime Python extras, including `hindsight-client` for agent-facing memory tools.
+- `den/hosts/nixos-hermes/services/hindsight-memory.nix` — host-local enablement and Hermes provider wiring.
+- `den/hosts/nixos-hermes/services/llama-server.nix` — llama.cpp service options and unit.
+- `den/hosts/nixos-hermes/services/hindsight-embed.nix` — PostgreSQL/Hindsight API service and writable venv setup.
+- `den/hosts/nixos-hermes/shared/packages.nix` — `opusCtypesShim`, the CPython `ctypes.util.find_library("opus")` workaround consumed through `PYTHONPATH`.
+- `den/hosts/nixos-hermes/services/hermes-agent/plugins.nix` — packaged Hermes runtime Python extras, including `hindsight-client` for agent-facing memory tools.
 - `tests/eval/hindsight-service-config.nix` — `checks.x86_64-linux.hindsight-service-config` regression check.
 
 ## Model file placement
@@ -215,7 +215,7 @@ Symptom:
 
 Fix:
 
-- `hindsight-client` is packaged in `modules/hermes-plugins.nix` through `services.hermes-agent.extraPythonPackages`.
+- `hindsight-client` is packaged in `den/hosts/nixos-hermes/services/hermes-agent/plugins.nix` through `services.hermes-agent.extraPythonPackages`.
 - `opusCtypesShim` remains only an Opus library-discovery workaround; it must not append the writable Hindsight venv to `sys.path`.
 - Rebuild and run `tools/hindsight-continuity-smoke.sh --timeout 180`.
 
@@ -246,7 +246,7 @@ services.hindsightMemory.enable = false;
 
 When disabled, the host config omits `services.hermes-agent.settings.memory.provider = "hindsight"`, omits the `hindsight-embed.service` requirement, and activation removes `$HERMES_HOME/hindsight/config.json` so stale provider config does not silently survive the rollback.
 
-For a full revert, remove the import of `hosts/hermes/hindsight-memory.nix` and any Hindsight-specific service modules only after confirming no other active issue depends on them.
+For a full revert, remove the import of `den/hosts/nixos-hermes/services/hindsight-memory.nix` and any Hindsight-specific service modules only after confirming no other active issue depends on them.
 
 ## Linear dogfood notes
 

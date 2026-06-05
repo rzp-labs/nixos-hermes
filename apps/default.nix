@@ -4,7 +4,7 @@
 # lockfile pin as the NixOS modules. Linux-only operational smokes wrap shell
 # scripts under ../tools. Invoke with:
 #   nix run .#nixos-anywhere -- --flake .#nixos-hermes ...
-#   nix run .#disko -- --mode disko hosts/hermes/disk-config.nix
+#   nix run .#disko -- --mode disko den/hosts/nixos-hermes/storage/disk-config.nix
 {
   pkgs,
   lib,

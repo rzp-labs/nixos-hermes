@@ -4,7 +4,7 @@ Agent Memory is the active Hermes memory provider on `nixos-hermes`. The current
 
 ## Declarative service
 
-The host imports `hosts/hermes/agentmemory.nix`, which defines and enables `services.agentmemory` by default for this host. Disable/rollback is one declarative change:
+The Den host graph imports `den/hosts/nixos-hermes/services/agentmemory.nix`, which defines and enables `services.agentmemory` by default for this host. Disable/rollback is one declarative change:
 
 ```nix
 services.agentmemory.enable = false;
@@ -96,8 +96,8 @@ AGENTMEMORY_TOOLS=core
 
 Hermes integration is declarative and split into two non-mutating paths:
 
-- `modules/hermes-plugins.nix` pins the Agent Memory source commit matching npm `0.9.21` (`1838f4d74c3a0accdd3764e7a8ec155cc140b831`) and installs `integrations/hermes` through `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
-- `hosts/hermes/agentmemory.nix` configures `services.hermes-agent.mcpServers.agentmemory` to run the pinned local package directly:
+- `den/hosts/nixos-hermes/services/hermes-agent/plugins.nix` pins the Agent Memory source commit matching npm `0.9.21` (`1838f4d74c3a0accdd3764e7a8ec155cc140b831`) and installs `integrations/hermes` through `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
+- `den/hosts/nixos-hermes/services/agentmemory.nix` configures `services.hermes-agent.mcpServers.agentmemory` to run the pinned local package directly:
 
   ```nix
   command = "${pkgs.agentmemory}/bin/agentmemory";
@@ -178,7 +178,7 @@ Declarative follow-up rollback if only the LLM-backed path should be disabled:
 services.agentmemory.llm.enable = false;
 ```
 
-or flip individual flags in `hosts/hermes/agentmemory.nix` if a specific feature proves bad. Keep any runtime-only service restart as a smoke test, not the final fix.
+or flip individual flags in `den/hosts/nixos-hermes/services/agentmemory.nix` if a specific feature proves bad. Keep any runtime-only service restart as a smoke test, not the final fix.
 
 ## Ripcords
 

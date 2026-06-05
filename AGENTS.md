@@ -87,7 +87,7 @@ nixos-hermes/
 - The committed encrypted secrets live under `hosts/hermes/secrets/`.
 - The `sops age` key is `/etc/secrets/age.key` on the host. The corresponding public key is registered in `.sops.yaml`. Do not change the public key in `.sops.yaml` without re-encrypting every secret file.
 - `.secrets/hermes-secrets.yaml` is the plaintext template (`gitignored`). Workflow: edit locally → `sops --encrypt .secrets/hermes-secrets.yaml > hosts/hermes/secrets/hermes-secrets.yaml` → commit the encrypted file → never commit the plaintext.
-- When adding a new secret key: add it to `.secrets/hermes-secrets.yaml`, add the `sops.secrets.<name>` binding in `hosts/hermes/sops.nix`, then re-encrypt.
+- When adding a new secret key: add it to `.secrets/hermes-secrets.yaml`, add the `sops.secrets.<name>` binding in `den/hosts/nixos-hermes/secrets/sops.nix`, then re-encrypt.
 
 ### Users
 
@@ -230,7 +230,7 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
     - Currently supplies `bun` and `llama-cpp` with Gemma 4 support until
       FlakeHub `NixOS/nixpkgs/0` catches up.
     - Netdata currently uses this package set as a base plus a scoped package
-      override in `hosts/hermes/netdata.nix` because both pinned nixpkgs inputs
+      override in `den/hosts/nixos-hermes/services/netdata.nix` because both pinned nixpkgs inputs
       lag Netdata Cloud's required stable agent release.
   - `nousresearch/hermes-agent`
     - Not published to FlakeHub at this time.
@@ -347,14 +347,14 @@ After first install:
   - The partition/pool sections are effectively reference documentation.
   - Changing them does not reformat disks, but the `mountpoint` attributes remain live: they control mounting on every rebuild.
 
-### `hosts/hermes/sops.nix`
+### `den/hosts/nixos-hermes/secrets/sops.nix`
 
 *Maps SOPS-encrypted files to runtime paths.*
 
 - Lives alongside `secrets/` so that `./secrets/...` paths resolve correctly.
 - The `sops age` key path (`/etc/secrets/age.key`) must not change without updating this file.
 
-### `hosts/hermes/virtualisation.nix`
+### `den/hosts/nixos-hermes/platform/virtualisation.nix`
 
 *Host-local Docker/libvirt substrate.*
 
@@ -363,13 +363,13 @@ After first install:
 - Docker group access is root-equivalent on this host. Adding `hermes` to `docker` is a deliberate operational trust decision for container-first workload proving, not a sandbox boundary.
 - The Docker ZFS storage driver is for the bare-metal ZFS host only. Guest Docker inside VMs/microVMs should use overlay2 on ext4/xfs to avoid stacked CoW over host ZFS.
 
-### `hosts/hermes/provision.nix`
+### `den/hosts/nixos-hermes/platform/provision.nix`
 
 *Host-specific activation scripts. Two categories:*
 
 - **One-shot provisioning:** activation scripts with a file-existence guard that run once on first boot to seed runtime state. Rebuilds do not clobber runtime-evolved state. To re-provision: delete the target file on the host, then rebuild.
 - **Recurring refresh:** activation scripts with no guard that run on every activation. Used for credentials and other state that must stay in sync with sops secrets.
-- Lives in `hosts/hermes/` (not `modules/`) because provisioning is host-specific,
+- Lives under `den/hosts/nixos-hermes/platform/` because provisioning is host-specific,
   not portable across hosts.
 - To re-provision a file: delete it on the host, then rebuild.
 

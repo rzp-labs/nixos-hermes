@@ -102,7 +102,7 @@ cp /path/to/age.key extra-files/etc/secrets/age.key
 chmod 400 extra-files/etc/secrets/age.key
 
 # 2. Kexec the target (if not already NixOS) into the NixOS installer, run
-#    disko from hosts/hermes/disk-config.nix, install, and reboot.
+#    disko from den/hosts/nixos-hermes/storage/disk-config.nix, install, and reboot.
 nix run .#nixos-anywhere -- \
   --flake .#nixos-hermes \
   --extra-files extra-files \
@@ -137,7 +137,7 @@ cd /root/nixos-hermes
 # creates GPT + ESPs + zpool + datasets, and mounts everything at /mnt
 # according to the mountpoint attributes. `.#disko` uses the lockfile-pinned
 # disko, matching the version the NixOS module was evaluated against.
-nix run .#disko -- --mode disko hosts/hermes/disk-config.nix
+nix run .#disko -- --mode disko den/hosts/nixos-hermes/storage/disk-config.nix
 
 # 4. Pre-place the age key inside the target root so sops-nix can decrypt
 # secrets during first activation.

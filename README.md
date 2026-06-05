@@ -44,7 +44,7 @@ replicates the primary ESP to the fallback via `rsync`.
 ZFS ARC is capped at 16GB to leave headroom for the agent workload.
 
 Disk layout, partitioning, and the generated `fileSystems.*` entries are all
-driven from `hosts/hermes/disk-config.nix` via the
+driven from `den/hosts/nixos-hermes/storage/disk-config.nix` via the
 [disko](https://github.com/nix-community/disko) NixOS module.
 
 ### Secrets Management
@@ -182,7 +182,7 @@ rm -rf extra-files
 ```
 
 This kexec's the target into the NixOS installer, runs disko from
-`hosts/hermes/disk-config.nix` to partition and mount, installs, and reboots.
+`den/hosts/nixos-hermes/storage/disk-config.nix` to partition and mount, installs, and reboots.
 The age key is seeded into `/etc/secrets/age.key` on the installed system so
 sops-nix can decrypt secrets on first activation.
 

@@ -112,7 +112,7 @@ in
         hasHomeManagerConfig = lib.mkOption {
           type = lib.types.bool;
           default = false;
-          description = "Whether modules/home-manager.nix declares a Home Manager config for this user.";
+          description = "Whether the Den-rendered Home Manager graph declares a config for this user.";
         };
 
         home = lib.mkOption {
