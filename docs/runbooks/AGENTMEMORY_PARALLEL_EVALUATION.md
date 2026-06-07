@@ -1,10 +1,10 @@
 # Agent Memory LLM runtime on nixos-hermes
 
-Agent Memory is the active Hermes memory provider on `nixos-hermes`. The current target shape is not a shadow observer: the host runs Agent Memory as a NixOS-managed service, Hermes uses the `nix-managed-agentmemory-hermes-plugin` provider, and LLM-backed Agent Memory behavior is routed through the local OMP auth gateway on loopback.
+Agent Memory is the active Hermes memory provider on `nixos-hermes`. The current target shape is not a shadow observer: the host runs Agent Memory as a NixOS-managed service, Hermes uses the `nix-managed-agentmemory-hermes-plugin` provider, and LLM-backed Agent Memory behavior is routed through the LAN CLIProxyAPI.
 
 ## Declarative service
 
-Den facts in `den/entities.nix` render `services.agentmemory`, enabled by default for this host. Disable/rollback is one declarative change in the Den service facts or rendered NixOS options:
+The host imports `hosts/hermes/agentmemory.nix`, which defines and enables `services.agentmemory` by default for this host. Disable/rollback is one declarative change:
 
 ```nix
 services.agentmemory.enable = false;
@@ -44,20 +44,36 @@ Upstream Agent Memory and the bundled `iii-config.yaml` bind REST/streams/viewer
 
 ## LLM provider contract
 
-Agent Memory uses an OpenAI-compatible chat provider through the local OMP auth gateway:
+Agent Memory uses an OpenAI-compatible chat provider through CLIProxyAPI:
 
 ```env
-OPENAI_BASE_URL=http://127.0.0.1:4000
+OPENAI_BASE_URL=http://10.0.0.102:8317
 OPENAI_MODEL=gpt-5.4-mini
 AGENTMEMORY_LLM_TIMEOUT_MS=120000
 OPENAI_TIMEOUT_MS=120000
-OPENAI_API_KEY=local-auth-gateway
 EMBEDDING_PROVIDER=local
 ```
 
-Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the gateway root (`http://127.0.0.1:4000`), not `http://127.0.0.1:4000/v1`.
+Important endpoint detail: Agent Memory `0.9.21` appends `/v1/chat/completions` internally, so `OPENAI_BASE_URL` must be the proxy root (`http://10.0.0.102:8317`), not `http://10.0.0.102:8317/v1`.
 
-The `OPENAI_API_KEY=local-auth-gateway` value is a local sentinel consumed by the loopback OMP gateway, not a LAN CLIProxyAPI credential. Do not add a SOPS CLIProxyAPI key for this path unless the architecture intentionally moves Agent Memory back to an external proxy.
+The CLIProxyAPI key is a raw SOPS secret readable only by the `agentmemory`
+service user:
+
+```nix
+sops.secrets.cliproxyapi-key = {
+  owner = "agentmemory";
+  group = "agentmemory";
+  mode = "0400";
+};
+```
+
+The startup wrapper waits briefly for `/run/secrets/cliproxyapi-key`, reads it
+inside the service process, and exports `OPENAI_API_KEY` there. Do not use
+`LoadCredential` for this secret: during `nixos-rebuild test`/activation,
+systemd can attempt to load credentials while sops-nix is rotating the
+`/run/secrets` symlink, producing a transient `status=243/CREDENTIALS` start
+failure that fails the rebuild even if auto-restart succeeds seconds later. The
+key must not appear in Nix store-backed environment files or generated config.
 
 ## Runtime flags
 
@@ -72,16 +88,16 @@ AGENTMEMORY_INJECT_CONTEXT=true
 AGENTMEMORY_TOOLS=core
 ```
 
-`AGENTMEMORY_ALLOW_AGENT_SDK=false` stays off because it is a separate fallback execution path and upstream warns it can spawn child-agent sessions that recurse through plugin hooks. The intended LLM path is the loopback OMP gateway through `OPENAI_API_KEY`, not Agent SDK fallback.
+`AGENTMEMORY_ALLOW_AGENT_SDK=false` stays off because it is a separate fallback execution path and upstream warns it can spawn child-agent sessions that recurse through plugin hooks. The intended LLM path is CLIProxyAPI through `OPENAI_API_KEY`, not Agent SDK fallback.
 
-`EMBEDDING_PROVIDER=local` is explicit so adding the OpenAI-compatible chat key does not silently move embedding traffic to the gateway. Change that only after remote embedding support is separately proven and intentionally selected.
+`EMBEDDING_PROVIDER=local` is explicit so adding the OpenAI-compatible chat key does not silently move embedding traffic to the proxy. Change that only after CLIProxyAPI embedding support is separately proven and intentionally selected.
 
 ## Hermes integration
 
 Hermes integration is declarative and split into two non-mutating paths:
 
-- `den/entities.nix` pins the Agent Memory source commit matching npm `0.9.21` (`1838f4d74c3a0accdd3764e7a8ec155cc140b831`) and installs `integrations/hermes` through rendered `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
-- `den/entities.nix` configures `services.hermes-agent.mcpServers.agentmemory` to run the pinned local package directly:
+- `modules/hermes-plugins.nix` pins the Agent Memory source commit matching npm `0.9.21` (`1838f4d74c3a0accdd3764e7a8ec155cc140b831`) and installs `integrations/hermes` through `services.hermes-agent.extraPlugins` with plugin name `agentmemory` enabled.
+- `hosts/hermes/agentmemory.nix` configures `services.hermes-agent.mcpServers.agentmemory` to run the pinned local package directly:
 
   ```nix
   command = "${pkgs.agentmemory}/bin/agentmemory";
@@ -138,10 +154,10 @@ Run the behavior smoke:
 tools/agentmemory-llm-smoke.sh --timeout 180
 ```
 
-If the OMP gateway process has a known systemd unit on the host, include it so the smoke reports whether gateway logs mention chat completions and the expected model:
+If the CLIProxyAPI process has a known systemd unit on the host, include it so the smoke reports whether proxy logs mention chat completions and the expected model:
 
 ```bash
-tools/agentmemory-llm-smoke.sh --timeout 180 --cliproxy-unit omp-auth-gateway.service
+tools/agentmemory-llm-smoke.sh --timeout 180 --cliproxy-unit <cliproxyapi-unit-name>
 ```
 
 The smoke seeds a disposable marker, verifies Agent Memory records/searches it, exercises `/agentmemory/enrich` and the packaged pre-tool hook when available, runs graph extraction, and runs the consolidation pipeline. It closes its throwaway Agent Memory session with `/agentmemory/session/end` in a `finally` block and fails if that session is not `completed` with `endedAt`, so repeated smoke runs do not inflate the active-session inventory before Docker or source A/B diagnostics. It fails on disabled/skipped responses instead of treating flag presence as success.
@@ -162,7 +178,7 @@ Declarative follow-up rollback if only the LLM-backed path should be disabled:
 services.agentmemory.llm.enable = false;
 ```
 
-or flip individual Agent Memory flags in `den/entities.nix` if a specific feature proves bad. Keep any runtime-only service restart as a smoke test, not the final fix.
+or flip individual flags in `hosts/hermes/agentmemory.nix` if a specific feature proves bad. Keep any runtime-only service restart as a smoke test, not the final fix.
 
 ## Ripcords
 

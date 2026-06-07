@@ -1,0 +1,34 @@
+{ lib, ... }:
+
+{
+  imports = [
+    ./hardware.nix
+    ./disk-config.nix
+    ./sops.nix
+    ./provision.nix
+    ./virtualisation.nix
+    ./llama-server.nix
+    ./hindsight-embed.nix
+    ./hindsight-memory.nix
+    ./agentmemory.nix
+    ./netdata.nix
+    ./omp-auth-gateway.nix
+    ../../modules/system.nix
+    ../../modules/packages.nix
+    ../../modules/home-manager.nix
+    ../../modules/hermes-agent.nix
+    ../../modules/hermes-plugins.nix
+    ../../modules/users.nix
+  ];
+
+  # Host identity — these are machine-specific constants that must not be
+  # shared across hosts or extracted into modules.
+  networking.hostName = "nixos-hermes";
+  # ZFS hostId ties the pool to this machine; changing it requires pool export/import.
+  networking.hostId = "52dd4e5a";
+
+  system.stateVersion = "25.05";
+
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  nix.settings.trusted-users = [ "admin" ];
+}

@@ -11,8 +11,6 @@
   nixpkgs,
   sops-nix,
   hermes-agent,
-  home-manager,
-  denModel,
 }:
 
 let
@@ -95,152 +93,8 @@ let
     ];
   };
 
-  denHost = denModel.den.hosts.x86_64-linux.nixos-hermes;
-  denRoot = denHost.users.root;
-  denAdmin = denHost.users.admin;
-  denHermes = denHost.users.hermes;
-  denPoc = denHost.users.den-poc;
-
-  assertAuthorizedKeys = user: keys: ''
-    machine.succeed("test -f /etc/ssh/authorized_keys.d/${user}")
-    machine.succeed("grep -cve '^$' /etc/ssh/authorized_keys.d/${user} | grep -qx ${toString (builtins.length keys)}")
-    ${builtins.concatStringsSep "\n" (
-      map (key: ''
-        machine.succeed("grep -Fx '${key}' /etc/ssh/authorized_keys.d/${user}")
-      '') keys
-    )}
-  '';
-
-  denHostVmModule =
-    { lib, ... }:
-    {
-      imports = [
-        sops-nix.nixosModules.sops
-        home-manager.nixosModules.home-manager
-        hermes-agent.nixosModules.default
-        denHost.mainModule
-      ];
-
-      # Den renders the real host's SOPS surface. This VM smoke proves VM-safe
-      # Den-rendered host/user behavior with dummy runtime secrets only, so keep
-      # sops-nix available while preventing real host secret activation.
-      sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
-      sops.age.sshKeyPaths = lib.mkForce [ ];
-      sops.defaultSopsFile = lib.mkForce testSecretsFile;
-      systemd.services.sops-nix.enable = false;
-      system.activationScripts.setupSecrets = lib.mkForce "";
-
-      systemd.tmpfiles.rules = [
-        "d /run/secrets 0755 root root - -"
-        "f /run/secrets/omp-auth-broker-token 0600 admin users - dummy-token"
-        "f /run/secrets/cliproxyapi-key 0600 agentmemory agentmemory - dummy-key"
-        "f /run/secrets/netdata-claim-conf 0600 netdata netdata - dummy-claim"
-        "f /run/secrets/hermes-env 0600 hermes hermes - GITHUB_TOKEN=dummy-token"
-      ];
-
-      # The general Den host VM smoke seeds dummy service files, but does not
-      # decrypt real secrets or prove real Hermes runtime health. Provisioning
-      # scripts are covered by activation-focused VM tests with test secrets.
-      system.activationScripts.hermes-soul-md = lib.mkForce "";
-      system.activationScripts.hermes-github-auth = lib.mkForce "";
-
-      # The real host creates some groups via imported service modules. This VM
-      # declares host-local group targets directly so user assertions stay
-      # independent from service migrations.
-      users.groups.networkmanager = { };
-      users.groups.hermes = { };
-      users.users.hermes = {
-        isSystemUser = true;
-        group = "hermes";
-      };
-
-      security.sudo.wheelNeedsPassword = false;
-      den.fixtures.denPoc.enable = true;
-
-      # NixOS tests provide an already-constructed pkgs instance, which makes
-      # nixpkgs.* options read-only in the guest module graph. The host still
-      # renders overlays at normal priority so co-imported overlays merge; the
-      # VM uses the supplied pkgs and must not re-declare them.
-      nixpkgs.overlays = lib.mkForce [ ];
-
-      # Override docker storage driver and netdata run directory for VM compatibility.
-      virtualisation.docker.storageDriver = lib.mkForce "overlay2";
-      services.netdata.config.global."run directory" = "/run/netdata";
-      systemd.services.netdata.serviceConfig.ExecStartPost = lib.mkForce [
-        (pkgs.writeShellScript "wait-for-netdata-up-vm" ''
-          deadline=$((SECONDS + 30))
-          until [ -S /run/netdata/ipc ] || [ -S /tmp/netdata/ipc ]; do
-            if [ "$SECONDS" -ge "$deadline" ]; then
-              echo "timed out waiting for netdata IPC socket" >&2
-              exit 1
-            fi
-            sleep 0.5
-          done
-        '')
-      ];
-      home-manager.users.den-poc = lib.mkIf denPoc.hasHomeManagerConfig {
-        imports = [
-          # Native Home Manager config deliberately remains alongside the
-          # Den-rendered module for the same user. This proves per-user
-          # incremental migration, not just different users on different paths.
-          {
-            home.packages = [ pkgs.bat ];
-          }
-        ];
-      };
-    };
-
 in
 {
-  # Test: build a VM from the Den-modeled host/user facts. This is the
-  # iteration harness for Den refactors: when a host module is migrated into a
-  # Den aspect, add its VM-safe assertions here before using the live host.
-  den-host-vm-smoke = pkgs.testers.runNixOSTest {
-    name = "den-host-vm-smoke";
-
-    nodes.machine = denHostVmModule;
-
-    testScript = ''
-      machine.wait_for_unit("multi-user.target")
-      machine.succeed("hostname | grep -qx nixos-hermes")
-      machine.succeed("getent passwd admin >/dev/null")
-      machine.succeed("getent passwd hermes >/dev/null")
-      machine.succeed("getent passwd den-poc >/dev/null")
-      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx wheel")
-      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx networkmanager")
-      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx hermes")
-      machine.succeed("test -d /home/admin")
-      machine.succeed("stat -c%a /home/admin | grep -qx 700")
-      ${assertAuthorizedKeys "root" denRoot.sshAuthorizedKeys}
-      ${assertAuthorizedKeys "admin" denAdmin.sshAuthorizedKeys}
-      ${assertAuthorizedKeys "hermes" denHermes.sshAuthorizedKeys}
-      machine.succeed("systemctl is-active --quiet home-manager-admin.service")
-      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/glow --version")
-      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/bat --version")
-      machine.succeed("runuser -u admin -- script -qec '/etc/profiles/per-user/admin/bin/yazi --version' /tmp/yazi-version >/dev/null 2>&1 && grep -qi 'yazi' /tmp/yazi-version")
-      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/omp --version")
-      machine.succeed("runuser -u admin -- /etc/profiles/per-user/admin/bin/home-manager --help")
-      machine.succeed("systemctl list-units --plain --state=active 'home-manager-*' | grep -F 'Home Manager environment for den-poc'")
-      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/glow")
-      machine.succeed("test -x /etc/profiles/per-user/den-poc/bin/bat")
-      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/glow --version")
-      machine.succeed("runuser -u den-poc -- /etc/profiles/per-user/den-poc/bin/bat --version")
-
-      # Sudo and Group Membership Verification
-      machine.succeed("runuser -u admin -- sudo -n true")
-      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx docker")
-      machine.succeed("id -nG admin | tr ' ' '\\n' | grep -qx libvirtd")
-
-      # Service Activation Verification
-      machine.wait_for_unit("docker.service")
-      machine.wait_for_unit("libvirtd.service")
-      machine.wait_for_unit("netdata.service")
-      machine.wait_for_unit("omp-auth-gateway.service")
-      machine.wait_for_unit("agentmemory.service")
-      machine.wait_for_open_port(4000)
-    '';
-  };
-
   # Test: switch to a prebuilt target inside a guest and verify an
   # activation-visible change. This catches changes that build cleanly but
   # only fail when switch-to-configuration runs, without depending on guest
@@ -282,32 +136,12 @@ in
     name = "activation-github-auth";
 
     nodes.machine =
-      { lib, ... }:
+      { ... }:
       {
         imports = [
           hermesBaseModule
-          denHost.mainModule
+          ../hosts/hermes/provision.nix
         ];
-
-        system.stateVersion = lib.mkForce "25.11";
-        # NixOS tests provide an already-constructed pkgs instance, which makes
-        # nixpkgs.* options read-only in the guest module graph. The host still
-        # renders overlays at normal priority so co-imported overlays merge; the
-        # VM uses the supplied pkgs and must not re-declare them.
-        nixpkgs.overlays = lib.mkForce [ ];
-        sops.age.keyFile = lib.mkForce "/run/age-keys.txt";
-        sops.age.sshKeyPaths = lib.mkForce [ ];
-        sops.defaultSopsFile = lib.mkForce testSecretsFile;
-        sops.secrets = lib.mkForce {
-          "hermes-env" = {
-            owner = "hermes";
-            mode = "0400";
-          };
-          "hermes-soul-md" = {
-            owner = "hermes";
-            mode = "0440";
-          };
-        };
       };
 
     testScript = ''
