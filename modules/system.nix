@@ -30,6 +30,9 @@
 
   security.sudo.wheelNeedsPassword = false;
 
+  # Enable nix-ld to run unpatched dynamic binaries (e.g. JetBrains Gateway remote backend agent)
+  programs.nix-ld.enable = true;
+
   environment.systemPackages = with pkgs; [
     curl
     wget

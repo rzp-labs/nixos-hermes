@@ -20,12 +20,9 @@
     # Pin Hermes Agent to maintainer-cut releases instead of default-branch
     # trunk. Upstream moves fast enough that unreleased commits deserve their
     # own validation branch, not a routine package refresh.
-    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.5.29.2";
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.6.5";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     llm-agents.url = "github:numtide/llm-agents.nix";
-    # Keep GitButler on a separately validated llm-agents revision while allowing
-    # the main llm-agents input to advance OMP and other agent tools.
-    llm-agents-gitbutler.url = "github:numtide/llm-agents.nix/c2ef928cbadd60280699e828973b14e21557c7ff";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
@@ -44,7 +41,6 @@
       nixos-anywhere,
       hermes-agent,
       llm-agents,
-      llm-agents-gitbutler,
       git-hooks,
       ...
     }@inputs:
@@ -66,7 +62,6 @@
             inputs
             nixpkgs-llama
             llm-agents
-            llm-agents-gitbutler
             ;
         };
         modules = [
