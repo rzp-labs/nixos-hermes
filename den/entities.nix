@@ -331,14 +331,14 @@ in
         };
         environmentSecretNames = [ "hermes-env" ];
         model = {
-          provider = "openai-codex";
+          provider = "custom";
           default = "gpt-5.5";
-          baseUrl = "https://api.openai.com/v1/responses";
+          baseUrl = "http://127.0.0.1:4000/v1";
         };
         fallbackModel = {
-          provider = "openrouter";
-          model = "openai/gpt-5.5";
-          baseUrl = "https://openrouter.ai/api/v1";
+          provider = "custom";
+          model = "gemini-3-flash-agent";
+          baseUrl = "http://127.0.0.1:4000/v1";
         };
         terminal = {
           backend = "local";
@@ -771,6 +771,8 @@ in
                 base_url = host.services.hermesAgent.model.baseUrl;
                 default = host.services.hermesAgent.model.default;
                 provider = host.services.hermesAgent.model.provider;
+                api_mode = "codex_responses";
+                openai_runtime = "auto";
               };
 
               # Automatic provider failover on rate limits, overload, or connection
@@ -780,6 +782,7 @@ in
                 provider = host.services.hermesAgent.fallbackModel.provider;
                 base_url = host.services.hermesAgent.fallbackModel.baseUrl;
                 model = host.services.hermesAgent.fallbackModel.model;
+                api_mode = "";
               };
 
               # Replaces the deprecated MESSAGING_CWD environment variable.
@@ -1826,28 +1829,6 @@ in
         {
           services.hermes-agent = {
             settings = {
-              model = {
-                # Route Hermes through OMP's loopback auth-gateway so OMP owns OAuth
-                # refresh and provider-specific Codex request shaping. Do not use the
-                # Hermes openai-codex provider here: Hermes 0.14 resolves that provider
-                # through its own ChatGPT OAuth credential pool and ignores model.base_url.
-                provider = "custom";
-                default = host.services.ompAuthGateway.primaryModel;
-                base_url = gatewayBaseUrl;
-                api_mode = "codex_responses";
-                openai_runtime = "auto";
-              };
-
-              fallback_model = {
-                # Keep fallback behind the same local gateway, but route it to a
-                # different upstream provider/model so OpenAI OAuth exhaustion does not
-                # take out both primary and failover. Clear api_mode here so Hermes
-                # does not reuse the primary Codex Responses shaping for Antigravity.
-                provider = "custom";
-                base_url = gatewayBaseUrl;
-                model = host.services.ompAuthGateway.fallbackModel;
-                api_mode = "";
-              };
 
               delegation = {
                 # Run subagents through the same admin-owned OMP auth gateway as the
