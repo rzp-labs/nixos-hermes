@@ -29,5 +29,5 @@ diff --git a/packages/coding-agent/src/cli/auth-gateway-cli.ts b/packages/coding
 +			if (!modelById.has(model.id)) modelById.set(model.id, model);
 +		}
  	}
- 
+
  	const handle = startAuthGateway({

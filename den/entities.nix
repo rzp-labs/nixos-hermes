@@ -768,18 +768,18 @@ in
             settings = {
               model = {
                 # OpenAI Codex provider uses the Responses API endpoint.
-                base_url = lib.mkDefault host.services.hermesAgent.model.baseUrl;
-                default = lib.mkDefault host.services.hermesAgent.model.default;
-                provider = lib.mkDefault host.services.hermesAgent.model.provider;
+                base_url = host.services.hermesAgent.model.baseUrl;
+                default = host.services.hermesAgent.model.default;
+                provider = host.services.hermesAgent.model.provider;
               };
 
               # Automatic provider failover on rate limits, overload, or connection
               # failures. OpenRouter uses an API key (not OAuth) so it survives
               # Nous inference token expiry or refresh failures.
               fallback_model = {
-                provider = lib.mkDefault host.services.hermesAgent.fallbackModel.provider;
-                base_url = lib.mkDefault host.services.hermesAgent.fallbackModel.baseUrl;
-                model = lib.mkDefault host.services.hermesAgent.fallbackModel.model;
+                provider = host.services.hermesAgent.fallbackModel.provider;
+                base_url = host.services.hermesAgent.fallbackModel.baseUrl;
+                model = host.services.hermesAgent.fallbackModel.model;
               };
 
               # Replaces the deprecated MESSAGING_CWD environment variable.
