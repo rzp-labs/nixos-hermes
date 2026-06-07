@@ -4,7 +4,6 @@
   inputs,
   nixpkgs-llama,
   llm-agents,
-  llm-agents-gitbutler,
   ...
 }:
 
@@ -25,7 +24,7 @@ let
   # i18n loader at the same locked source revision so gateway slash commands do
   # not render raw keys such as gateway.resume.list_header.
   #
-  # Hermes 0.15.x's pyproject still includes only `hermes_cli`, not
+  # Hermes 0.15.x/0.16.x's pyproject still includes only `hermes_cli`, not
   # `hermes_cli.*`, so uv2nix omits the new `hermes_cli.proxy` subpackage from
   # the sealed environment. Extend the installed package path to the locked
   # source tree instead of patching generated/bundled output.
@@ -74,8 +73,7 @@ in
   nixpkgs.overlays = [
     # llm-agents.nix provides claude-code, codex, omp, agent-browser, and many more.
     # Use the default overlay for the fast-moving main input so npm packages build
-    # with llm-agents' own compatible nixpkgs; GitButler is overridden below from
-    # a separate pinned input.
+    # with llm-agents' own compatible nixpkgs.
     llm-agents.overlays.default
     (final: prev: {
       # Exposed via overlay so consumers (hermes-agent.nix) can reference
@@ -258,96 +256,90 @@ in
       );
       llama-cpp = final.llamaPackageSet.llama-cpp;
 
-      llm-agents =
-        let
-          pinnedGitButlerPackages = llm-agents-gitbutler.packages.${final.stdenv.hostPlatform.system};
-        in
-        prev.llm-agents
-        // {
-          omp = prev.llm-agents.omp.overrideAttrs (
-            oldAttrs:
-            let
-              napiArch =
-                {
-                  x86_64 = "x64";
-                  aarch64 = "arm64";
+      llm-agents = prev.llm-agents // {
+        omp = prev.llm-agents.omp.overrideAttrs (
+          oldAttrs:
+          let
+            napiArch =
+              {
+                x86_64 = "x64";
+                aarch64 = "arm64";
+              }
+              .${final.stdenv.hostPlatform.parsed.cpu.name}
+                or (throw "Unsupported OMP native addon CPU: ${final.stdenv.hostPlatform.parsed.cpu.name}");
+            napiPlatform = "${final.stdenv.hostPlatform.parsed.kernel.name}-${napiArch}";
+          in
+          {
+            # The upstream package builds a Bun standalone executable. With Bun
+            # 1.3.14 that ELF segfaults in glibc's loader after Nix autoPatchelf,
+            # before OMP userland code runs. OMP is a Node/Bun CLI, so package it
+            # in the usual runner shape instead: build only the Rust native addon
+            # and generated assets, then run the TypeScript entrypoint with Bun.
+            autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
+
+            patches = (oldAttrs.patches or [ ]) ++ [
+              ../packages/omp-auth-gateway-tool-call-id.patch
+              ../packages/omp-auth-gateway-cached-models.patch
+            ];
+
+            buildPhase = ''
+              runHook preBuild
+
+              export LD_LIBRARY_PATH="${lib.makeLibraryPath [ final.stdenv.cc.cc.lib ]}"
+              export LIBCLANG_PATH="${final.libclang.lib}/lib"
+
+              echo "Building Rust native addon..."
+              cargo build --release -p pi-natives --target ${final.stdenv.hostPlatform.rust.rustcTarget} --target-dir target
+
+              mkdir -p packages/natives/native
+              cp target/${final.stdenv.hostPlatform.rust.rustcTarget}/release/libpi_natives.so \
+                packages/natives/native/pi_natives.${napiPlatform}.node
+
+              napiBin="$(pwd)/node_modules/.bin/napi"
+              if [ -x "$napiBin" ]; then
+                "$napiBin" build \
+                  --manifest-path crates/pi-natives/Cargo.toml \
+                  --package-json-path packages/natives/package.json \
+                  --platform \
+                  --no-js \
+                  --dts index.d.ts \
+                  -o packages/natives/native \
+                  --release \
+                  || echo "napi CLI post-processing failed; using cargo output directly"
+              fi
+
+              if [ -f packages/natives/scripts/gen-enums.ts ] && \
+                 [ -f packages/natives/native/index.d.ts ]; then
+                bun packages/natives/scripts/gen-enums.ts
+              fi
+
+              echo "Generating docs index..."
+              bun packages/coding-agent/scripts/generate-docs-index.ts
+
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+
+              mkdir -p $out/lib/omp/source $out/bin
+              cp -R package.json bun.lock node_modules packages $out/lib/omp/source/
+
+              makeWrapper ${final.bun}/bin/bun $out/bin/omp \
+                --add-flags "$out/lib/omp/source/packages/coding-agent/src/cli.ts" \
+                --set PI_SKIP_VERSION_CHECK 1 \
+                --prefix LD_LIBRARY_PATH : ${
+                  lib.makeLibraryPath [
+                    final.zlib
+                    final.stdenv.cc.cc.lib
+                  ]
                 }
-                .${final.stdenv.hostPlatform.parsed.cpu.name}
-                  or (throw "Unsupported OMP native addon CPU: ${final.stdenv.hostPlatform.parsed.cpu.name}");
-              napiPlatform = "${final.stdenv.hostPlatform.parsed.kernel.name}-${napiArch}";
-            in
-            {
-              # The upstream package builds a Bun standalone executable. With Bun
-              # 1.3.14 that ELF segfaults in glibc's loader after Nix autoPatchelf,
-              # before OMP userland code runs. OMP is a Node/Bun CLI, so package it
-              # in the usual runner shape instead: build only the Rust native addon
-              # and generated assets, then run the TypeScript entrypoint with Bun.
-              autoPatchelfIgnoreMissingDeps = [ "libc.musl-x86_64.so.1" ];
 
-              patches = (oldAttrs.patches or [ ]) ++ [
-                ../packages/omp-auth-gateway-tool-call-id.patch
-                ../packages/omp-auth-gateway-cached-models.patch
-              ];
-
-              buildPhase = ''
-                runHook preBuild
-
-                export LD_LIBRARY_PATH="${lib.makeLibraryPath [ final.stdenv.cc.cc.lib ]}"
-                export LIBCLANG_PATH="${final.libclang.lib}/lib"
-
-                echo "Building Rust native addon..."
-                cargo build --release -p pi-natives --target ${final.stdenv.hostPlatform.rust.rustcTarget} --target-dir target
-
-                mkdir -p packages/natives/native
-                cp target/${final.stdenv.hostPlatform.rust.rustcTarget}/release/libpi_natives.so \
-                  packages/natives/native/pi_natives.${napiPlatform}.node
-
-                napiBin="$(pwd)/node_modules/.bin/napi"
-                if [ -x "$napiBin" ]; then
-                  "$napiBin" build \
-                    --manifest-path crates/pi-natives/Cargo.toml \
-                    --package-json-path packages/natives/package.json \
-                    --platform \
-                    --no-js \
-                    --dts index.d.ts \
-                    -o packages/natives/native \
-                    --release \
-                    || echo "napi CLI post-processing failed; using cargo output directly"
-                fi
-
-                if [ -f packages/natives/scripts/gen-enums.ts ] && \
-                   [ -f packages/natives/native/index.d.ts ]; then
-                  bun packages/natives/scripts/gen-enums.ts
-                fi
-
-                echo "Generating docs index..."
-                bun packages/coding-agent/scripts/generate-docs-index.ts
-
-                runHook postBuild
-              '';
-
-              installPhase = ''
-                runHook preInstall
-
-                mkdir -p $out/lib/omp/source $out/bin
-                cp -R package.json bun.lock node_modules packages $out/lib/omp/source/
-
-                makeWrapper ${final.bun}/bin/bun $out/bin/omp \
-                  --add-flags "$out/lib/omp/source/packages/coding-agent/src/cli.ts" \
-                  --set PI_SKIP_VERSION_CHECK 1 \
-                  --prefix LD_LIBRARY_PATH : ${
-                    lib.makeLibraryPath [
-                      final.zlib
-                      final.stdenv.cc.cc.lib
-                    ]
-                  }
-
-                runHook postInstall
-              '';
-            }
-          );
-          but = pinnedGitButlerPackages.but;
-        };
+              runHook postInstall
+            '';
+          }
+        );
+      };
     })
   ];
 }

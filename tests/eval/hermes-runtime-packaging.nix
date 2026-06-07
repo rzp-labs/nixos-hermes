@@ -17,7 +17,7 @@ let
 in
 pkgs.runCommand "hermes-runtime-packaging" { } ''
                 set -eu
-                test '${hermesPackage.version}' = '0.15.2'
+                test '${hermesPackage.version}' = '0.16.0'
                 PYTHONPATH='${hostPkgs.opusCtypesShim}' '${hermesPackage.passthru.hermesVenv}/bin/python3' - <<'PY'
   import ctypes.util
   import importlib.util

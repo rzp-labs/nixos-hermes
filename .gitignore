@@ -102,3 +102,9 @@ result-*
 # Local Repowise index/wiki state
 .repowise/
 .direnv/
+
+# Local untracked design reference docs
+ARCHITECTURE.md
+
+# Local agent state and guides
+.hermes/
