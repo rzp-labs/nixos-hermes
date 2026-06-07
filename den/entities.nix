@@ -767,7 +767,7 @@ in
 
             settings = {
               model = {
-                # OpenAI Codex provider uses the Responses API endpoint.
+                # Custom provider routes through the local OMP auth gateway with Codex Responses API shaping.
                 base_url = host.services.hermesAgent.model.baseUrl;
                 default = host.services.hermesAgent.model.default;
                 provider = host.services.hermesAgent.model.provider;
@@ -776,8 +776,8 @@ in
               };
 
               # Automatic provider failover on rate limits, overload, or connection
-              # failures. OpenRouter uses an API key (not OAuth) so it survives
-              # Nous inference token expiry or refresh failures.
+              # failures. Fallback routes through the same local OMP gateway but on a
+              # different upstream model lane (Gemini) for provider-level isolation.
               fallback_model = {
                 provider = host.services.hermesAgent.fallbackModel.provider;
                 base_url = host.services.hermesAgent.fallbackModel.baseUrl;
