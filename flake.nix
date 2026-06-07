@@ -30,8 +30,6 @@
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     repowise-nix.url = "path:./packages/repowise-nix";
     repowise-nix.inputs.nixpkgs.follows = "nixpkgs";
-    den.url = "github:denful/den/v0.17.0";
-    import-tree.url = "github:vic/import-tree";
   };
 
   outputs =
@@ -62,36 +60,24 @@
       treefmt-nix = llm-agents.inputs.treefmt-nix;
     in
     {
-      nixosConfigurations.nixos-hermes =
-        let
-          denHost = self.denModel.den.hosts.x86_64-linux.nixos-hermes;
-        in
-        nixpkgs.lib.nixosSystem {
-          system = denHost.nixpkgsHostPlatform;
-          specialArgs = {
-            inherit
-              inputs
-              nixpkgs-llama
-              llm-agents
-              llm-agents-gitbutler
-              ;
-          };
-          modules = [
-            determinate.nixosModules.default
-            sops-nix.nixosModules.sops
-            disko.nixosModules.default
-            (
-              { ... }:
-              {
-                disko.devices = denHost.storage.diskoDevices;
-              }
-            )
-            home-manager.nixosModules.home-manager
-            hermes-agent.nixosModules.default
-            denHost.mainModule
-          ]
-          ++ map (path: ./. + "/${path}") denHost.moduleImports;
+      nixosConfigurations.nixos-hermes = nixpkgs.lib.nixosSystem {
+        specialArgs = {
+          inherit
+            inputs
+            nixpkgs-llama
+            llm-agents
+            llm-agents-gitbutler
+            ;
         };
+        modules = [
+          determinate.nixosModules.default
+          sops-nix.nixosModules.sops
+          disko.nixosModules.default
+          home-manager.nixosModules.home-manager
+          hermes-agent.nixosModules.default
+          ./hosts/hermes
+        ];
+      };
 
       # Expose `nix fmt` for all dev systems.
       # Formats Nix files with nixfmt-rfc-style + deadnix (from ./treefmt.nix).
@@ -127,28 +113,20 @@
           linuxChecks =
             if system == "x86_64-linux" then
               let
-                vmTests = self.nixosConfigurations.nixos-hermes.pkgs.callPackage ./tests {
-                  inherit
-                    nixpkgs
-                    sops-nix
-                    hermes-agent
-                    home-manager
-                    ;
-                  denModel = self.denModel;
+                vmTests = pkgs.callPackage ./tests {
+                  inherit nixpkgs sops-nix hermes-agent;
                 };
                 evalChecks = import ./tests/eval {
                   inherit pkgs;
                   hostSystem = self.nixosConfigurations.nixos-hermes;
-                  denModel = self.denModel;
                 };
               in
               {
                 # VM tests — QEMU only available on Linux.
-                # See AGENTS.md for the testing ladder — use VM tests when a
-                # build/eval cannot prove activation or runtime-shaped behavior.
+                # See AGENTS.md for the testing ladder — use VM tests only for
+                # activation script changes.
                 inherit (vmTests)
                   activation-github-auth
-                  den-host-vm-smoke
                   vm-switch-smoke
                   ;
               }
@@ -170,17 +148,8 @@
         import ./apps {
           inherit (nixpkgs) lib;
           inherit system nixos-anywhere disko;
-          hostDiskoDevices = self.denModel.den.hosts.x86_64-linux.nixos-hermes.storage.diskoDevices;
           pkgs = nixpkgs.legacyPackages.${system};
         }
       );
-
-      # Eval-only Den model surface. This is not the deployment output;
-      # nixosConfigurations.nixos-hermes above remains the host source of truth.
-      denModel =
-        (nixpkgs.lib.evalModules {
-          modules = [ ./den ];
-          specialArgs = { inherit inputs; };
-        }).config;
     };
 }

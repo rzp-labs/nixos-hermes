@@ -13,7 +13,7 @@ creation_rules:
       - age:
           - *host_key
 
-  - path_regex: den/hosts/nixos-hermes/secrets/payload/.*
+  - path_regex: hosts/hermes/secrets/.*
     key_groups:
       - age:
           - *host_key

@@ -15,5 +15,5 @@ rules:
     level: warning
 
 ignore: |
-  den/hosts/nixos-hermes/secrets/payload/
+  hosts/hermes/secrets/
   tests/assets/
