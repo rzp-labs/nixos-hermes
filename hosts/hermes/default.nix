@@ -13,10 +13,12 @@
     ./agentmemory.nix
     ./netdata.nix
     ./omp-auth-gateway.nix
+    ./dashboard.nix
     ../../modules/system.nix
     ../../modules/packages.nix
     ../../modules/home-manager.nix
     ../../modules/hermes-agent.nix
+    ../../modules/hermes-dashboard.nix
     ../../modules/hermes-plugins.nix
     ../../modules/users.nix
   ];
