@@ -13,11 +13,11 @@
     ./agentmemory.nix
     ./netdata.nix
     ./omp-auth-gateway.nix
-    ./hermes-dashboard.nix
     ../../modules/system.nix
     ../../modules/packages.nix
     ../../modules/home-manager.nix
     ../../modules/hermes-agent.nix
+    ../../modules/hermes-dashboard.nix
     ../../modules/hermes-plugins.nix
     ../../modules/users.nix
   ];
@@ -29,6 +29,8 @@
   networking.hostId = "52dd4e5a";
 
   system.stateVersion = "25.05";
+
+  services.hermes-dashboard.enable = true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   nix.settings.trusted-users = [ "admin" ];

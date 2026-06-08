@@ -7,6 +7,7 @@ let
   unit = hostConfig.systemd.services.hermes-dashboard;
   service = unit.serviceConfig;
   env = unit.environment;
+  dashboardCfg = hostConfig.services.hermes-dashboard;
   hermesCfg = hostConfig.services.hermes-agent;
   hermesPackage = hermesCfg.package.override {
     inherit (hermesCfg) extraDependencyGroups extraPythonPackages;
@@ -17,6 +18,10 @@ pkgs.runCommand "hermes-dashboard-service-config" { } ''
   set -eu
   test '${if builtins.elem "hermes-dashboard" serviceNames then "true" else "false"}' = 'true'
   test '${if builtins.elem "hermes-webui" serviceNames then "true" else "false"}' = 'false'
+  test '${if dashboardCfg.enable then "true" else "false"}' = 'true'
+  test '${dashboardCfg.host}' = '127.0.0.1'
+  test '${toString dashboardCfg.port}' = '9119'
+  test '${if dashboardCfg.skipBuild then "true" else "false"}' = 'true'
   test '${service.User}' = '${hermesCfg.user}'
   test '${service.Group}' = '${hermesCfg.group}'
   test '${service.WorkingDirectory}' = '${hermesCfg.workingDirectory}'

@@ -45,6 +45,7 @@ nixos-hermes/
 │   ├── system.nix                       # locale, tz, networking, packages, sudo
 │   ├── home-manager.nix                 # Home Manager wiring for admin/operator user environment
 │   ├── hermes-agent.nix                 # hermes service declaration
+│   ├── hermes-dashboard.nix             # native Hermes dashboard service module
 │   ├── hermes-plugins.nix               # declarative Hermes plugin packages/enables
 │   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds, Repowise)
 │   └── users.nix                        # immutable user + SSH key declarations
@@ -363,6 +364,14 @@ After first install:
 
 - All core `services.hermes-agent.*` options belong here.
 - Secrets are referenced by name from the `sops` bindings.
+
+### `modules/hermes-dashboard.nix`
+
+*Native Hermes dashboard/admin backend service module.*
+
+- Owns `services.hermes-dashboard.*` options and the `hermes-dashboard.service` systemd unit.
+- Keep the reusable service shape here; host files should only enable it and set host-specific option values.
+- The dashboard consumes the configured Hermes package/runtime state but runs as a separate foreground process and listener.
 
 ### `modules/hermes-plugins.nix`
 
