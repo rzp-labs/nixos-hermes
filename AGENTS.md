@@ -35,6 +35,7 @@ nixos-hermes/
 ├── hosts/
 │   └── hermes/
 │       ├── default.nix                  # host entry: identity constants + imports
+│       ├── dashboard.nix                # host-specific Hermes dashboard enablement
 │       ├── disk-config.nix              # disko layout (imported; generates fileSystems.*)
 │       ├── hardware.nix                 # boot, initrd, kernel, GPU, ZFS services (filesystems via disko)
 │       ├── provision.nix                # host-specific activation scripts (one-shot provisioning + recurring refresh)

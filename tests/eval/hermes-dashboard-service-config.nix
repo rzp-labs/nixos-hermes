@@ -18,6 +18,9 @@ pkgs.runCommand "hermes-dashboard-service-config" { } ''
   set -eu
   test '${if builtins.elem "hermes-dashboard" serviceNames then "true" else "false"}' = 'true'
   test '${if builtins.elem "hermes-webui" serviceNames then "true" else "false"}' = 'false'
+  test '${
+    if builtins.hasAttr "hermes-dashboard" hostConfig.services then "true" else "false"
+  }' = 'true'
   test '${if dashboardCfg.enable then "true" else "false"}' = 'true'
   test '${dashboardCfg.host}' = '127.0.0.1'
   test '${toString dashboardCfg.port}' = '9119'
@@ -46,6 +49,9 @@ pkgs.runCommand "hermes-dashboard-service-config" { } ''
   ${service.ExecStart}
   EOF
   grep -q -- 'http://127.0.0.1:9119/' <<'EOF'
+  ${service.ExecStartPost}
+  EOF
+  grep -q -- '--retry 30' <<'EOF'
   ${service.ExecStartPost}
   EOF
   test '${service.ProtectSystem}' = 'strict'

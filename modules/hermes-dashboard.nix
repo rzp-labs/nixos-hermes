@@ -12,7 +12,22 @@ let
   hermesPackage = hermesCfg.package.override {
     inherit (hermesCfg) extraDependencyGroups extraPythonPackages;
   };
-  dashboardUrl = "http://${cfg.host}:${toString cfg.port}/";
+  dashboardHealthHostRaw =
+    if cfg.host == "0.0.0.0" then
+      "127.0.0.1"
+    else if cfg.host == "::" then
+      "::1"
+    else
+      cfg.host;
+  dashboardHealthHost =
+    if
+      builtins.match ".*:.*" dashboardHealthHostRaw != null && !lib.hasPrefix "[" dashboardHealthHostRaw
+    then
+      "[${dashboardHealthHostRaw}]"
+    else
+      dashboardHealthHostRaw;
+  dashboardUrl = "http://${dashboardHealthHost}:${toString cfg.port}/";
+  retryCount = if cfg.skipBuild then 30 else 300;
 in
 {
   options.services.hermes-dashboard = {
@@ -89,7 +104,7 @@ in
           ]
           ++ lib.optionals cfg.skipBuild [ "--skip-build" ]
         );
-        ExecStartPost = "${pkgs.curl}/bin/curl --retry 30 --retry-delay 1 --retry-connrefused -fsS ${dashboardUrl}";
+        ExecStartPost = "${pkgs.curl}/bin/curl --retry ${toString retryCount} --retry-delay 1 --retry-connrefused -fsS ${dashboardUrl}";
         Restart = "always";
         RestartSec = "5s";
 
@@ -97,7 +112,7 @@ in
         PrivateTmp = true;
         ProtectHome = false;
         ProtectSystem = "strict";
-        ReadWritePaths = [
+        ReadWritePaths = lib.filter (path: path != null) [
           hermesCfg.stateDir
           hermesCfg.workingDirectory
         ];
