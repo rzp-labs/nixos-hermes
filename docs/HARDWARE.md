@@ -225,7 +225,7 @@ Network hardware:
 
 ## Placement Policy
 
-The fleet uses role-based placement rather than host-by-host vibes.
+The fleet uses role-based placement rather than host-by-host guesswork.
 
 | Workload shape | Default placement | Reason |
 |---|---|---|
