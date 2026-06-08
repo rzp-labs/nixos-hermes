@@ -27,8 +27,20 @@ let
     else
       dashboardHealthHostRaw;
   dashboardUrl = "http://${dashboardHealthHost}:${toString cfg.port}/";
-  retryCount = if cfg.skipBuild then 30 else 300;
+  readinessTimeoutSec = if cfg.skipBuild then 30 else 300;
   timeoutStartSec = if cfg.skipBuild then 90 else 360;
+  readyCheck = pkgs.writeShellScript "hermes-dashboard-ready-check" ''
+    deadline=$((SECONDS + ${toString readinessTimeoutSec}))
+    while [ "$SECONDS" -le "$deadline" ]; do
+      if ${pkgs.curl}/bin/curl --max-time 2 -fsS ${lib.escapeShellArg dashboardUrl} >/dev/null; then
+        exit 0
+      fi
+      sleep 1
+    done
+
+    echo "Hermes dashboard did not become ready within ${toString readinessTimeoutSec}s" >&2
+    exit 1
+  '';
 in
 {
   options.services.hermes-dashboard = {
@@ -105,7 +117,7 @@ in
           ]
           ++ lib.optionals cfg.skipBuild [ "--skip-build" ]
         );
-        ExecStartPost = "${pkgs.curl}/bin/curl --retry ${toString retryCount} --retry-delay 1 --retry-connrefused -fsS ${dashboardUrl}";
+        ExecStartPost = readyCheck;
         Restart = "always";
         RestartSec = "5s";
 

@@ -48,12 +48,12 @@ pkgs.runCommand "hermes-dashboard-service-config" { } ''
   grep -q -- '--skip-build' <<'EOF'
   ${service.ExecStart}
   EOF
-  grep -q -- 'http://127.0.0.1:9119/' <<'EOF'
+  grep -q -- 'hermes-dashboard-ready-check' <<'EOF'
   ${service.ExecStartPost}
   EOF
-  grep -q -- '--retry 30' <<'EOF'
-  ${service.ExecStartPost}
-  EOF
+  grep -q -- 'http://127.0.0.1:9119/' ${service.ExecStartPost}
+  grep -q -- '--max-time 2' ${service.ExecStartPost}
+  grep -q -- 'Hermes dashboard did not become ready within 30s' ${service.ExecStartPost}
   test '${toString service.TimeoutStartSec}' = '90'
   test '${service.ProtectSystem}' = 'strict'
   test '${if service.ProtectHome then "true" else "false"}' = 'false'
