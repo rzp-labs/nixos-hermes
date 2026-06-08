@@ -20,7 +20,8 @@ nixos-hermes/
 │   │   ├── repowise-nix-tooling.nix     # Repowise / vite-plus / cli-proxy-api wiring
 │   │   ├── agentmemory-service-config.nix # agentmemory unit + Hermes plugin wiring
 │   │   ├── netdata-service-config.nix   # Netdata config + observe wrapper + MCP wiring
-│   │   └── hindsight-service-config.nix # asserts Hindsight memory stays disabled
+│   │   ├── hindsight-service-config.nix # asserts Hindsight memory stays disabled
+│   │   └── hermes-dashboard-service-config.nix # native dashboard unit wiring
 │   └── default.nix                      # nixosTest VM test suite
 ├── checks/
 │   └── pre-commit.nix                   # git-hooks.nix hook config (dev shell + pre-commit-check)

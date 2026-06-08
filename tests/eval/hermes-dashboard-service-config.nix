@@ -54,6 +54,7 @@ pkgs.runCommand "hermes-dashboard-service-config" { } ''
   grep -q -- '--retry 30' <<'EOF'
   ${service.ExecStartPost}
   EOF
+  test '${toString service.TimeoutStartSec}' = '90'
   test '${service.ProtectSystem}' = 'strict'
   test '${if service.ProtectHome then "true" else "false"}' = 'false'
   grep -q -- '${hermesCfg.stateDir}' <<'EOF'

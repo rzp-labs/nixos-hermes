@@ -28,6 +28,7 @@ let
       dashboardHealthHostRaw;
   dashboardUrl = "http://${dashboardHealthHost}:${toString cfg.port}/";
   retryCount = if cfg.skipBuild then 30 else 300;
+  timeoutStartSec = if cfg.skipBuild then 90 else 360;
 in
 {
   options.services.hermes-dashboard = {
@@ -116,6 +117,7 @@ in
           hermesCfg.stateDir
           hermesCfg.workingDirectory
         ];
+        TimeoutStartSec = timeoutStartSec;
         TimeoutStopSec = 30;
         UMask = "0007";
       };
