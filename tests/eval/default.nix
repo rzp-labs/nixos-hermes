@@ -27,4 +27,5 @@ in
   agentmemory-service-config = call ./agentmemory-service-config.nix;
   netdata-service-config = call ./netdata-service-config.nix;
   hindsight-service-config = call ./hindsight-service-config.nix;
+  hermes-dashboard-service-config = call ./hermes-dashboard-service-config.nix;
 }

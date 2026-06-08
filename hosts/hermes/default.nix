@@ -13,6 +13,7 @@
     ./agentmemory.nix
     ./netdata.nix
     ./omp-auth-gateway.nix
+    ./hermes-dashboard.nix
     ../../modules/system.nix
     ../../modules/packages.nix
     ../../modules/home-manager.nix
