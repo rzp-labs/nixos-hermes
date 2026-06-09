@@ -16,10 +16,10 @@ let
   systemPackages = builtins.concatStringsSep "\n" (
     map toString hostConfig.environment.systemPackages
   );
-  adminHome = hostConfig.home-manager.users.admin;
-  adminHomePackages = builtins.concatStringsSep "\n" (map toString adminHome.home.packages);
-  adminHomeSessionPath = builtins.concatStringsSep "\n" adminHome.home.sessionPath;
-  adminBashInit = adminHome.programs.bash.initExtra;
+  hermesHome = hostConfig.home-manager.users.hermes;
+  hermesHomePackages = builtins.concatStringsSep "\n" (map toString hermesHome.home.packages);
+  hermesHomeSessionPath = builtins.concatStringsSep "\n" hermesHome.home.sessionPath;
+  hermesBashInit = hermesHome.programs.bash.initExtra;
 in
 pkgs.runCommand "repowise-nix-tooling" { } ''
   set -eu
@@ -86,19 +86,16 @@ pkgs.runCommand "repowise-nix-tooling" { } ''
   ${systemPackages}
   EOF
   grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
-  ${adminHomePackages}
+  ${hermesHomePackages}
   EOF
   grep -q -- '${hostPkgs.nodejs}' <<'EOF'
-  ${adminHomePackages}
-  EOF
-  grep -q -- '${hostPkgs.llm-agents.omp}' <<'EOF'
-  ${adminHomePackages}
+  ${hermesHomePackages}
   EOF
   grep -q -- '.vite-plus/bin' <<'EOF'
-  ${adminHomeSessionPath}
+  ${hermesHomeSessionPath}
   EOF
   grep -q -- '.vite-plus/env' <<'EOF'
-  ${adminBashInit}
+  ${hermesBashInit}
   EOF
   ! grep -q -- '${hostPkgs.vite-plus}' <<'EOF'
   ${systemPackages}

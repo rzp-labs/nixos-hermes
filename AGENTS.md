@@ -21,6 +21,7 @@ nixos-hermes/
 │   │   ├── agentmemory-service-config.nix # agentmemory unit + Hermes plugin wiring
 │   │   ├── netdata-service-config.nix   # Netdata config + observe wrapper + MCP wiring
 │   │   ├── hindsight-service-config.nix # asserts Hindsight memory stays disabled
+│   │   ├── admin-home-profile.nix       # standalone admin Home Manager profile tools
 │   │   └── hermes-dashboard-service-config.nix # native dashboard unit wiring
 │   └── default.nix                      # nixosTest VM test suite
 ├── checks/
@@ -45,12 +46,15 @@ nixos-hermes/
 │       └── secrets/                     # committed SOPS-encrypted files
 ├── modules/
 │   ├── system.nix                       # locale, tz, networking, packages, sudo
-│   ├── home-manager.nix                 # Home Manager wiring for admin/operator user environment
+│   ├── home-manager.nix                 # NixOS Home Manager wiring for hermes + HM CLI install
 │   ├── hermes-agent.nix                 # hermes service declaration
 │   ├── hermes-dashboard.nix             # native Hermes dashboard service module
 │   ├── hermes-plugins.nix               # declarative Hermes plugin packages/enables
 │   ├── packages.nix                     # nixpkgs overlays (llm-agents.nix + local workarounds, Repowise)
 │   └── users.nix                        # immutable user + SSH key declarations
+├── home/
+│   ├── common.nix                       # shared Home Manager shell/tooling fragment
+│   └── admin.nix                        # standalone admin Home Manager profile
 ```
 
 ---
@@ -238,12 +242,15 @@ values and has no real-world value. It is allowlisted in `.gitleaks.toml`.
 
 *Pure-evaluation assertion checks, one file per check.*
 
-- Each `tests/eval/<name>.nix` is a function `{ pkgs, hostConfig, hostPkgs, ... }:`
-  returning a `runCommand` derivation that asserts on the *built* host config
-  (unit env, package versions, wrapper script contents, plugin wiring, …).
+- Most `tests/eval/<name>.nix` files are functions
+  `{ pkgs, hostConfig, hostPkgs, ... }:` returning a `runCommand` derivation
+  that asserts on the *built* host config (unit env, package versions, wrapper
+  script contents, plugin wiring, …). Checks that target standalone Home
+  Manager outputs receive the relevant `homeConfig` instead.
 - `tests/eval/default.nix` is the aggregator: it takes the evaluated
-  `hostSystem` once and feeds `config`/`pkgs` into each check, then surfaces them
-  through `flake.nix`'s `checks.x86_64-linux.*` output.
+  `hostSystem` plus the standalone admin `homeSystem`, feeds `config`/`pkgs`
+  into each check, then surfaces them through `flake.nix`'s
+  `checks.x86_64-linux.*` output.
 - These are evaluation/build checks, **not** VM tests — they sit alongside the VM
   suite in `tests/` but never boot a guest. Run one with
   `nix build .#checks.x86_64-linux.<name>`.
@@ -353,12 +360,25 @@ After first install:
 
 ### `modules/home-manager.nix`
 
-*User-scoped interactive/operator environment.*
+*NixOS-side Home Manager wiring.*
 
-- Owns Home Manager module configuration for user environments managed on this host.
-- Keep human/operator shell UX and per-user toolchains here rather than in host-wide shell init.
-- Shared user-facing toolchains used by both the operator and the Hermes service persona belong here for each intended home, not in `environment.systemPackages` by accident.
-- Add other service accounts deliberately; review their runtime state boundary before Home Manager owns additional home files.
+- Installs the version-matched `home-manager` CLI from the flake input for user
+  bootstrap and ongoing standalone switches.
+- Keeps only the NixOS-module-managed `home-manager.users.hermes` service-account
+  profile. Do not re-add `admin` here; it is standalone under `home/`.
+- Imports `../home/common.nix` so the Hermes service persona keeps the shared
+  Vite+ shell/tooling setup without self-managing its profile.
+
+### `home/`
+
+*Home Manager user profiles and shared fragments.*
+
+- `home/common.nix` owns shared bash init, `.vite-plus` PATH setup, and common
+  Vite+/Node packages for user profiles.
+- `home/admin.nix` owns `homeConfigurations."admin@nixos-hermes"` and is switched
+  as `admin` with `home-manager switch --flake .#"admin@nixos-hermes"`.
+- After the host rebuild that drops module-managed `admin`, run the first
+  standalone switch with `-b backup` to absorb files left by the old generation.
 
 ### `modules/hermes-agent.nix`
 

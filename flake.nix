@@ -74,6 +74,11 @@
         ];
       };
 
+      homeConfigurations."admin@nixos-hermes" = home-manager.lib.homeManagerConfiguration {
+        pkgs = self.nixosConfigurations.nixos-hermes.pkgs;
+        modules = [ ./home/admin.nix ];
+      };
+
       # Expose `nix fmt` for all dev systems.
       # Formats Nix files with nixfmt-rfc-style + deadnix (from ./treefmt.nix).
       formatter = forDevSystems (
@@ -114,6 +119,7 @@
                 evalChecks = import ./tests/eval {
                   inherit pkgs;
                   hostSystem = self.nixosConfigurations.nixos-hermes;
+                  homeSystem = self.homeConfigurations."admin@nixos-hermes";
                 };
               in
               {
