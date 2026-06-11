@@ -11,10 +11,12 @@
 #   nix build .#checks.x86_64-linux.<name>
 #
 # `hostSystem` is the evaluated NixOS system attrset; each check receives
-# the host `config` and `pkgs` it needs.
+# the host `config` and `pkgs` it needs. `homeSystem` is the standalone admin
+# Home Manager configuration.
 {
   pkgs,
   hostSystem,
+  homeSystem,
 }:
 let
   hostConfig = hostSystem.config;
@@ -28,4 +30,8 @@ in
   netdata-service-config = call ./netdata-service-config.nix;
   hindsight-service-config = call ./hindsight-service-config.nix;
   hermes-dashboard-service-config = call ./hermes-dashboard-service-config.nix;
+  admin-home-profile = import ./admin-home-profile.nix {
+    inherit pkgs;
+    homeConfig = homeSystem;
+  };
 }
