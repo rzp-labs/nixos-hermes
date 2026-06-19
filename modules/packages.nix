@@ -316,6 +316,9 @@ in
               echo "Generating docs index..."
               bun packages/coding-agent/scripts/generate-docs-index.ts
 
+              echo "Generating HTML export tool views..."
+              bun --cwd=packages/collab-web run build:tool-views
+
               runHook postBuild
             '';
 

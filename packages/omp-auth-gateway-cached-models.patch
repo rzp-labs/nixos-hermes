@@ -1,15 +1,20 @@
 diff --git a/packages/coding-agent/src/cli/auth-gateway-cli.ts b/packages/coding-agent/src/cli/auth-gateway-cli.ts
 --- a/packages/coding-agent/src/cli/auth-gateway-cli.ts
 +++ b/packages/coding-agent/src/cli/auth-gateway-cli.ts
-@@ -29,6 +29,7 @@ import {
- 	getBundledProviders,
+@@ -23,10 +23,12 @@ import {
+ 	type CredentialCompletionResult,
+ 	completeSimple,
  	type Model,
- 	RemoteAuthCredentialStore,
-+	readModelCache,
- 	type SnapshotResponse,
- 	startAuthGateway,
  } from "@oh-my-pi/pi-ai";
-@@ -167,7 +168,9 @@ async function serveGateway(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
+ import { AuthBrokerClient, RemoteAuthCredentialStore, type SnapshotResponse } from "@oh-my-pi/pi-ai/auth-broker";
+ import { DEFAULT_AUTH_GATEWAY_BIND, startAuthGateway } from "@oh-my-pi/pi-ai/auth-gateway";
++import { buildModel } from "@oh-my-pi/pi-catalog/build";
++import { readModelCache } from "@oh-my-pi/pi-catalog/model-cache";
+ import { type GeneratedProvider, getBundledModels, getBundledProviders } from "@oh-my-pi/pi-catalog/models";
+ import { getConfigRootDir, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
+ import chalk from "chalk";
+ import { type AuthBrokerClientConfig, resolveAuthBrokerConfig } from "../session/auth-broker-config";
+@@ -162,7 +164,9 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
  	// Build the model resolver + catalog from pi-ai's bundled metadata, scoped
  	// to providers we hold credentials for. Format handlers ask `resolveModel`
  	// to translate a client-requested `model` field into a pi-ai `Model<Api>`
@@ -20,13 +25,13 @@ diff --git a/packages/coding-agent/src/cli/auth-gateway-cli.ts b/packages/coding
  	const snapshot = storage.exportSnapshot();
  	const providersWithCreds = new Set<string>();
  	for (const entry of snapshot.credentials) providersWithCreds.add(entry.provider);
-@@ -179,6 +182,10 @@ async function serveGateway(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
+@@ -175,6 +179,10 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
  			// stick to the provider listed first by getBundledProviders.
  			if (!modelById.has(model.id)) modelById.set(model.id, model);
  		}
 +		const cache = readModelCache<Api>(provider, Number.POSITIVE_INFINITY, Date.now);
-+		for (const model of cache?.models ?? []) {
-+			if (!modelById.has(model.id)) modelById.set(model.id, model);
++		for (const modelSpec of cache?.models ?? []) {
++			if (!modelById.has(modelSpec.id)) modelById.set(modelSpec.id, buildModel(modelSpec));
 +		}
  	}
 
