@@ -25,10 +25,11 @@ diff --git a/packages/coding-agent/src/cli/auth-gateway-cli.ts b/packages/coding
  	const snapshot = storage.exportSnapshot();
  	const providersWithCreds = new Set<string>();
  	for (const entry of snapshot.credentials) providersWithCreds.add(entry.provider);
-@@ -175,6 +179,10 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
+@@ -175,6 +179,11 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
  			// stick to the provider listed first by getBundledProviders.
  			if (!modelById.has(model.id)) modelById.set(model.id, model);
  		}
++		// readModelCache expects a clock thunk so cache age is computed at read time.
 +		const cache = readModelCache<Api>(provider, Number.POSITIVE_INFINITY, Date.now);
 +		for (const modelSpec of cache?.models ?? []) {
 +			if (!modelById.has(modelSpec.id)) modelById.set(modelSpec.id, buildModel(modelSpec));
