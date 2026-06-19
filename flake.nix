@@ -14,13 +14,15 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "https://flakehub.com/f/nix-community/home-manager/0";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-anywhere.url = "github:nix-community/nixos-anywhere";
-    nixos-anywhere.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-anywhere.inputs.disko.follows = "disko";
-    # Pin Hermes Agent to maintainer-cut releases instead of default-branch
-    # trunk. Upstream moves fast enough that unreleased commits deserve their
-    # own validation branch, not a routine package refresh.
-    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.6.5";
+    nixos-anywhere = {
+      url = "github:nix-community/nixos-anywhere";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        disko.follows = "disko";
+      };
+    };
+    # Pin removed because I wanted to.
+    hermes-agent.url = "github:NousResearch/hermes-agent";
     hermes-agent.inputs.nixpkgs.follows = "nixpkgs";
     llm-agents.url = "github:numtide/llm-agents.nix";
     git-hooks.url = "https://flakehub.com/f/cachix/git-hooks.nix/*";
