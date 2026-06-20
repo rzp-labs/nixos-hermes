@@ -26,8 +26,10 @@ let
   #
   # Hermes 0.15.x/0.16.x's pyproject still includes only `hermes_cli`, not
   # `hermes_cli.*`, so uv2nix omits the new `hermes_cli.proxy` subpackage from
-  # the sealed environment. Extend the installed package path to the locked
-  # source tree instead of patching generated/bundled output.
+  # the sealed environment. Hermes 0.17.0 added `cron.scheduler_provider`; the
+  # gateway imports it during startup, so keep `cron` extensible from the locked
+  # source too. Extend installed package paths to the locked source tree instead
+  # of patching generated/bundled output.
   opusCtypesShim = pkgs.writeTextDir "sitecustomize.py" ''
     import ctypes.util as _cu
     from pathlib import Path as _Path
@@ -35,6 +37,7 @@ let
     _OPUS_PATH = "${pkgs.libopus}/lib/libopus.so.0"
     _HERMES_LOCALES = _Path("${hermesLocales}")
     _HERMES_CLI_SOURCE = "${inputs.hermes-agent}/hermes_cli"
+    _HERMES_CRON_SOURCE = "${inputs.hermes-agent}/cron"
     _orig = _cu.find_library
 
     def find_library(name, *args, **kwargs):
@@ -49,6 +52,14 @@ let
 
         if hasattr(_hermes_cli, "__path__") and _HERMES_CLI_SOURCE not in _hermes_cli.__path__:
             _hermes_cli.__path__.append(_HERMES_CLI_SOURCE)
+    except ImportError:
+        pass
+
+    try:
+        import cron as _hermes_cron
+
+        if hasattr(_hermes_cron, "__path__") and _HERMES_CRON_SOURCE not in _hermes_cron.__path__:
+            _hermes_cron.__path__.append(_HERMES_CRON_SOURCE)
     except ImportError:
         pass
 

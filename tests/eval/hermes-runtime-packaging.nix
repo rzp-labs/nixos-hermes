@@ -17,7 +17,7 @@ let
 in
 pkgs.runCommand "hermes-runtime-packaging" { } ''
                 set -eu
-                test '${hermesPackage.version}' = '0.16.0'
+                test '${hermesPackage.version}' = '0.17.0'
                 PYTHONPATH='${hostPkgs.opusCtypesShim}' '${hermesPackage.passthru.hermesVenv}/bin/python3' - <<'PY'
   import ctypes.util
   import importlib.util
@@ -25,7 +25,7 @@ pkgs.runCommand "hermes-runtime-packaging" { } ''
 
   missing = [
       name
-      for name in ["hermes_cli.proxy", "discord", "gateway", "hermes_cli.gateway"]
+      for name in ["hermes_cli.proxy", "discord", "gateway", "hermes_cli.gateway", "cron.scheduler_provider"]
       if importlib.util.find_spec(name) is None
   ]
   if missing:
